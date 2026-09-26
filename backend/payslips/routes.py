@@ -3,37 +3,26 @@ from flask import (
     request,
     jsonify,
     send_file,
-    url_for,
     render_template,
-    session,
     abort,
 )
+
 from io import BytesIO
 from datetime import date
-from auth.routes import api_login_required
+
 from employees.service import get_employee
 from payroll.history import list_payslip_periods
-from payslips.service import build_payslip_view, serialize_payslip
+from payslips.service import build_payslip_view
 
 
-def can_view(code):
-    return (
-        session.get("role") != "client"
-        or not session.get("employee_code")
-        or session.get("employee_code") == code
-    )
-
-
-bp = Blueprint("payslips", __name__)
+bp = Blueprint(
+    "payslips",
+    __name__
+)
 
 
 @bp.get("/api/payslip-history/<code>")
-@api_login_required
 def history(code):
-    if not can_view(code):
-        return jsonify(
-            error="You don't have permission to view this history."
-        ), 403
 
     e = get_employee(code)
 
@@ -43,11 +32,12 @@ def history(code):
         ), 404
 
     today = date.today()
+
     periods = list_payslip_periods(code)
 
     if not any(
-        p["month"] == today.month and
-        p["year"] == today.year
+        p["month"] == today.month
+        and p["year"] == today.year
         for p in periods
     ):
         periods.insert(
@@ -58,7 +48,7 @@ def history(code):
                 "monthly_tds": None,
                 "has_snapshot": True,
                 "label": today.strftime("%B %Y"),
-            },
+            }
         )
 
     return jsonify(
@@ -71,10 +61,7 @@ def history(code):
 
 
 @bp.get("/generate-payroll/<code>")
-@api_login_required
 def html_payslip(code):
-    if not can_view(code):
-        abort(403)
 
     e = get_employee(code)
 
@@ -113,11 +100,7 @@ def html_payslip(code):
 
 
 @bp.get("/download-payslip/<code>")
-@api_login_required
 def download(code):
-
-    if not can_view(code):
-        abort(403)
 
     e = get_employee(code)
 
@@ -217,10 +200,9 @@ def download(code):
     except Exception as exc:
 
         import traceback
+
         traceback.print_exc()
 
         return jsonify(
             error=f"Unable to generate PDF: {exc}"
         ), 500
-
-
