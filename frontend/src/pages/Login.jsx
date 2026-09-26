@@ -39,110 +39,9 @@ export default function Login() {
     }
   };
 
-  return (
+ return (
     <main className="min-h-screen bg-slate-50">
       <div className="flex min-h-screen flex-col lg:flex-row">
-
-        {/* =====================================================
-            LEFT - COMPANY PANEL
-        ====================================================== */}
-        <section className="relative hidden overflow-hidden bg-slate-950 lg:flex lg:w-1/2 xl:w-[55%]">
-          
-          {/* Background decoration */}
-          <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-blue-600/20 blur-3xl" />
-          <div className="absolute -bottom-40 -right-32 h-[500px] w-[500px] rounded-full bg-indigo-600/20 blur-3xl" />
-
-          <div className="relative z-10 flex w-full flex-col justify-between p-12 xl:p-16">
-
-            {/* Brand */}
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-900/30">
-                  <i className="fa-solid fa-wallet text-xl" />
-                </div>
-
-                <div>
-                  <h1 className="text-xl font-bold tracking-tight text-white">
-                    PayRoll
-                  </h1>
-
-                  <p className="mt-0.5 text-xs font-medium uppercase tracking-widest text-slate-400">
-                    {COMPANY_NAME}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main message */}
-            <div className="max-w-xl">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-blue-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                Employee Payroll Management
-              </div>
-
-              <h2 className="text-4xl font-bold leading-tight tracking-tight text-white xl:text-5xl">
-                Simple, secure and
-                <span className="block text-blue-400">
-                  smarter payroll.
-                </span>
-              </h2>
-
-              <p className="mt-6 max-w-lg text-base leading-7 text-slate-400">
-                Manage payroll, employee information, payslips and salary
-                details from one secure and professional platform.
-              </p>
-
-              {/* Features */}
-              <div className="mt-10 grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 text-blue-400">
-                    <i className="fa-solid fa-shield-halved" />
-                  </span>
-
-                  <span className="text-sm font-medium text-slate-300">
-                    Secure Access
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 text-blue-400">
-                    <i className="fa-solid fa-file-invoice-dollar" />
-                  </span>
-
-                  <span className="text-sm font-medium text-slate-300">
-                    Digital Payslips
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 text-blue-400">
-                    <i className="fa-solid fa-users" />
-                  </span>
-
-                  <span className="text-sm font-medium text-slate-300">
-                    Employee Management
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 text-blue-400">
-                    <i className="fa-solid fa-chart-line" />
-                  </span>
-
-                  <span className="text-sm font-medium text-slate-300">
-                    Payroll Insights
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <p className="text-xs text-slate-500">
-              © {new Date().getFullYear()} {COMPANY_NAME}. All rights reserved.
-            </p>
-          </div>
-        </section>
-
         {/* =====================================================
             RIGHT - LOGIN
         ====================================================== */}
@@ -170,9 +69,6 @@ export default function Login() {
 
               {/* Header */}
               <div className="mb-8">
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                  <i className="fa-solid fa-right-to-bracket" />
-                </div>
 
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900">
                   Sign in
@@ -276,4 +172,4 @@ export default function Login() {
       </div>
     </main>
   );
-}
+} 

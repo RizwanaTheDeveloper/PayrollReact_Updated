@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link} from "react-router-dom";
 import { api } from "../services/api";
 import { useToast } from "../context/ToastContext";
 import EmployeeTable from "../components/EmployeeTable";
@@ -14,7 +14,6 @@ export default function Dashboard({ user }) {
   const [open, setOpen] = useState(false);
 
   const { notify } = useToast();
-  const nav = useNavigate();
 
   const load = () =>
     api
@@ -157,25 +156,29 @@ export default function Dashboard({ user }) {
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex flex-col gap-3 border-t border-slate-200 p-5 sm:flex-row sm:justify-end sm:p-6">
-                <button
-                  type="button"
-                  onClick={() => nav(`/payroll/${e.EmployeeCode}`)}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-200"
-                >
-                  <i className="fa-solid fa-file-invoice-dollar" />
-                  View Payslip
-                </button>
+             {/* Actions */}
+{/* Actions */}
+<div className="flex flex-col gap-3 border-t border-slate-200 p-5 sm:flex-row sm:justify-end sm:p-6">
 
-                <a
-                  href={`/download-payslip/${e.EmployeeCode}`}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100"
-                >
-                  <i className="fa-solid fa-download" />
-                  Download
-                </a>
-              </div>
+  {/* Payslip - same as Admin */}
+  <Link
+    to={`/payroll/${e.EmployeeCode}`}
+    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-200"
+  >
+    <i className="fa-solid fa-file-invoice-dollar" />
+    Payslip
+  </Link>
+
+  {/* History */}
+  <Link
+    to={`/payslips/${e.EmployeeCode}`}
+    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100"
+  >
+    <i className="fa-solid fa-clock-rotate-left" />
+    History
+  </Link>
+
+</div>
             </section>
           </>
         )}
