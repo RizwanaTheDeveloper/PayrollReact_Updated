@@ -1,1 +1,12 @@
-import {useState} from 'react';export default function PasswordInput(props){const[v,setV]=useState(false);return <div className="password"><input {...props} type={v?'text':'password'}/><button type="button" onClick={()=>setV(!v)}><i className={`fa-solid ${v?'fa-eye-slash':'fa-eye'}`}/></button></div>}
+import { useState } from "react";
+export default function PasswordInput(props) {
+  const [v, setV] = useState(false);
+  return (
+    <div className="password">
+      <input {...props} type={v ? "text" : "password"} />
+      <button type="button" onClick={() => setV(!v)}>
+        <i className={`fa-solid ${v ? "fa-eye-slash" : "fa-eye"}`} />
+      </button>
+    </div>
+  );
+}

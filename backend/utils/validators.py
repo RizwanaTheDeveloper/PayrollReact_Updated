@@ -2,8 +2,11 @@ import re
 from datetime import datetime
 
 PAN_PATTERN = re.compile(r'^[A-Z]{5}[0-9]{4}[A-Z]$')
+EMPLOYEE_CODE_PATTERN = re.compile(r'^[A-Z0-9-]+$')
+
 
 def parse_employee_payload(form):
+    employee_code = str(form.get('employee_code') or '').strip().upper()
     full_name = str(form.get('full_name') or '').strip()
     department = str(form.get('department') or '').strip()
     designation = str(form.get('designation') or '').strip()
@@ -16,33 +19,70 @@ def parse_employee_payload(form):
     regime_opted = str(form.get('regime_opted') or 'New').strip()
     working_days_raw = str(form.get('working_days') or '').strip()
 
-    if not full_name or ctc_raw in (None, '') or not joining_date_raw or not working_days_raw:
+    # Employee Code
+    if not employee_code:
+        return None, 'Employee Code is required.'
+
+    if not EMPLOYEE_CODE_PATTERN.fullmatch(employee_code):
+        return None, 'Employee Code can contain only letters, numbers, and hyphens.'
+
+    # Required fields
+    if (
+        not full_name
+        or ctc_raw in (None, '')
+        or not joining_date_raw
+        or not working_days_raw
+    ):
         return None, 'Full Name, Joining Date, CTC, and Working Days are required.'
+
+    # CTC
     try:
         ctc = float(ctc_raw)
     except (TypeError, ValueError):
         return None, 'CTC must be a valid number.'
+
     if ctc <= 0:
         return None, 'CTC must be greater than zero.'
+
+    # Joining Date
     try:
-        joining_date = datetime.strptime(joining_date_raw, '%Y-%m-%d').date()
+        joining_date = datetime.strptime(
+            joining_date_raw,
+            '%Y-%m-%d'
+        ).date()
     except ValueError:
         return None, 'Joining Date must be a valid date (YYYY-MM-DD).'
+
+    # Working Days
     try:
         working_days = int(working_days_raw)
     except ValueError:
         return None, 'Working Days must be a whole number.'
+
     if working_days < 0 or working_days > 31:
         return None, 'Working Days must be between 0 and 31.'
+
+    # PAN
     if pan and not PAN_PATTERN.fullmatch(pan):
-        return None, 'PAN must be in the standard format: 5 letters, 4 digits, 1 letter (e.g. ABCDE1234F).'
-    if pf_uan and not pf_uan.isdigit():
-        return None, 'PF UAN must contain digits only.'
+        return None, (
+            'PAN must be in the standard format: '
+            '5 letters, 4 digits, 1 letter (e.g. ABCDE1234F).'
+        )
+
+    # PF UAN
+    if pf_uan and not re.fullmatch(r'^[0-9]{12}$', pf_uan):
+        return None, 'PF UAN must contain exactly 12 digits.'
+
+    # Account Number
     if account_number and not account_number.isdigit():
         return None, 'Account Number must contain digits only, no letters or symbols.'
+
+    # Tax Regime
     if regime_opted not in ('New', 'Old'):
         regime_opted = 'New'
+
     return {
+        'employee_code': employee_code,
         'full_name': full_name,
         'department': department or None,
         'designation': designation or None,

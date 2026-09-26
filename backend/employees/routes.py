@@ -28,12 +28,41 @@ def one(code):
 @bp.post('')
 @api_role_required('admin')
 def create():
-    body=request.get_json(silent=True) or {};d,error=parse_employee_payload(body)
-    if error:return jsonify(error=error),400
-    code=add_employee(**d);warning=None
-    if body.get('login_username') or body.get('login_password'):_,warning=upsert_employee_login(code,body.get('login_username'),body.get('login_password'))
-    return jsonify(employee_code=code,warning=warning),201
+    body = request.get_json(silent=True) or {}
 
+    d, error = parse_employee_payload(body)
+
+    if error:
+        return jsonify(error=error), 400
+
+    try:
+        code = add_employee(**d)
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except Exception as e:
+        print("CREATE EMPLOYEE ERROR:", repr(e))
+        return jsonify(error="Failed to create employee."), 500
+
+    warning = None
+
+    try:
+        if body.get('login_username') or body.get('login_password'):
+            _, warning = upsert_employee_login(
+                code,
+                body.get('login_username'),
+                body.get('login_password')
+            )
+    except Exception as e:
+        print("EMPLOYEE LOGIN ERROR:", repr(e))
+        warning = "Employee was created, but login credentials could not be saved."
+
+    return jsonify(
+        employee_code=code,
+        warning=warning
+    ), 201
+    
+    
+    
 @bp.put('/<code>')
 @api_role_required('admin')
 def edit(code):

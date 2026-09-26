@@ -159,115 +159,13 @@ def download(code):
 
     try:
 
-        # --------------------------------------------------
-        # PLAYWRIGHT
-        # --------------------------------------------------
-
         from playwright.sync_api import sync_playwright
-
-        # --------------------------------------------------
-        # PAYSLIP DATA
-        # --------------------------------------------------
-
-        employee = view.get("employee", {})
-        payroll = view.get("payroll", {})
-        tax = view.get("tax", {})
-
-        # --------------------------------------------------
-        # FORCE TWO DECIMAL PLACES
-        # --------------------------------------------------
-
-        def money(value):
-            try:
-                return f"{float(value or 0):,.2f}"
-            except (TypeError, ValueError):
-                return "0.00"
-
-        # --------------------------------------------------
-        # FORMAT PAYROLL VALUES
-        # --------------------------------------------------
-
-        payroll_for_pdf = dict(payroll)
-
-        money_fields = [
-            "basic",
-            "hra",
-            "special_allowance",
-            "lta",
-            "bonus",
-            "gross_earnings",
-            "professional_tax",
-            "epf",
-            "tds",
-            "total_deductions",
-            "net_salary",
-            "per_day_salary",
-        ]
-
-        for field in money_fields:
-            if field in payroll_for_pdf:
-                payroll_for_pdf[field] = money(
-                    payroll_for_pdf[field]
-                )
-
-        # --------------------------------------------------
-        # FORMAT TAX VALUES
-        # --------------------------------------------------
-
-        tax_for_pdf = dict(tax)
-
-        tax_money_fields = [
-            "annual_taxable_salary",
-            "standard_deduction",
-            "net_taxable_income",
-            "net_tax",
-        ]
-
-        for field in tax_money_fields:
-            if field in tax_for_pdf:
-                tax_for_pdf[field] = money(
-                    tax_for_pdf[field]
-                )
-
-        # --------------------------------------------------
-        # WORKING DAYS
-        # --------------------------------------------------
-
-        working_days = payroll.get(
-            "working_days",
-            getattr(e, "WorkingDays", 0)
-        )
-
-        days_in_month = payroll.get(
-            "days_in_month",
-            0
-        )
-
-        # --------------------------------------------------
-        # BUILD PDF VIEW
-        # --------------------------------------------------
-
-        pdf_view = dict(view)
-
-        pdf_view["payroll"] = payroll_for_pdf
-        pdf_view["tax"] = tax_for_pdf
-
-        pdf_view["working_days"] = working_days
-        pdf_view["days_in_month"] = days_in_month
-
-        # --------------------------------------------------
-        # RENDER SAME PAYSLIP TEMPLATE
-        # --------------------------------------------------
 
         html = render_template(
             "payroll.html",
-            **pdf_view,
+            **view,
             company_name="5Gen Educon Private Limited",
         )
-
-        # --------------------------------------------------
-        # GENERATE PDF
-        # --------------------------------------------------
 
         with sync_playwright() as p:
 
@@ -306,10 +204,6 @@ def download(code):
 
             browser.close()
 
-        # --------------------------------------------------
-        # RETURN PDF
-        # --------------------------------------------------
-
         return send_file(
             BytesIO(pdf),
             mimetype="application/pdf",
@@ -323,9 +217,10 @@ def download(code):
     except Exception as exc:
 
         import traceback
-
         traceback.print_exc()
 
         return jsonify(
             error=f"Unable to generate PDF: {exc}"
         ), 500
+
+

@@ -1,89 +1,507 @@
 <!doctype html>
-<html>
-
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Payslip</title>
+    <title>Payslip - {{ period_label }}</title>
+
     <style>
+        @page {
+            size: A4;
+            margin: 10mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            padding: 30px;
-            color: #222
+            margin: 0;
+            background: #ffffff;
+            color: #172033;
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
         }
 
         .payslip {
-            max-width: 850px;
-            margin: auto
+            max-width: 900px;
+            margin: auto;
+            border: 1px solid #dfe5ef;
         }
 
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px
-        }
-
-        .panel {
-            border: 1px solid #ddd;
-            padding: 18px;
-            margin: 12px 0
-        }
-
-        .row {
+        .payslip-header {
             display: flex;
             justify-content: space-between;
-            padding: 7px 0;
-            border-bottom: 1px solid #eee
+            align-items: center;
+            padding: 28px;
+            background: #14213d;
+            color: white;
         }
 
-        .total {
-            font-weight: 700
+        .company-block {
+            display: flex;
+            align-items: center;
+            gap: 14px;
         }
 
-        .net {
+        .company-logo {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            background: rgba(255,255,255,.15);
+            display: grid;
+            place-items: center;
             font-size: 22px;
+        }
+
+        .company-name {
+            font-size: 20px;
             font-weight: 700;
-            margin-top: 20px
+        }
+
+        .company-subtitle {
+            margin-top: 4px;
+            font-size: 12px;
+            opacity: .75;
+        }
+
+        .payslip-title {
+            text-align: right;
+        }
+
+        .payslip-title h1 {
+            margin: 4px 0;
+        }
+
+        .payslip-label {
+            font-size: 10px;
+            letter-spacing: 1.5px;
+        }
+
+        .period {
+            font-size: 13px;
+        }
+
+        .payslip-section {
+            padding: 24px 28px;
+        }
+
+        .section-heading {
+            margin-bottom: 16px;
+        }
+
+        .section-heading h2 {
+            margin: 0;
+            font-size: 17px;
+        }
+
+        .section-heading span {
+            color: #788397;
+            font-size: 11px;
+        }
+
+        .employee-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            border: 1px solid #e6eaf0;
+        }
+
+        .info-item {
+            padding: 13px;
+            background: #fafbfd;
+            border-right: 1px solid #e6eaf0;
+            border-bottom: 1px solid #e6eaf0;
+        }
+
+        .info-item span {
+            display: block;
+            text-transform: uppercase;
+            font-size: 9px;
+            color: #788397;
+            margin-bottom: 5px;
+        }
+
+        .info-item strong {
+            font-size: 12px;
+        }
+
+        .salary-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            padding: 0 28px;
+        }
+
+        .salary-card {
+            border: 1px solid #e2e7ef;
+        }
+
+        .salary-card-header {
+            padding: 14px 16px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e7ef;
+        }
+
+        .salary-card-header h2 {
+            margin: 0;
+            font-size: 15px;
+        }
+
+        .salary-card-header span {
+            font-size: 10px;
+            color: #788397;
+        }
+
+        .salary-lines {
+            padding: 5px 16px;
+        }
+
+        .salary-line {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #edf0f5;
+            font-size: 12px;
+        }
+
+        .salary-line strong {
+            font-variant-numeric: tabular-nums;
+        }
+
+        .total-line {
+            font-weight: 700;
+            border-bottom: 0;
+        }
+
+        .net-salary-card {
+            margin: 22px 28px;
+            padding: 18px 20px;
+            background: #eaf2ff;
+            border: 1px solid #cfe0ff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .net-salary-card span {
+            display: block;
+            font-weight: 700;
+            color: #19345f;
+        }
+
+        .net-salary-card small {
+            display: block;
+            margin-top: 3px;
+            color: #667085;
+        }
+
+        .net-salary-card strong {
+            font-size: 23px;
+            color: #174ea6;
+        }
+
+        .tax-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            border: 1px solid #e3e8ef;
+        }
+
+        .tax-item {
+            padding: 14px;
+            background: #fafbfd;
+            border-right: 1px solid #e3e8ef;
+        }
+
+        .tax-item span {
+            display: block;
+            color: #788397;
+            font-size: 9px;
+            margin-bottom: 5px;
+        }
+
+        .tax-item strong {
+            font-size: 12px;
+        }
+
+        .payslip-footer {
+            display: flex;
+            justify-content: space-between;
+            padding: 16px 28px;
+            background: #f8fafc;
+            border-top: 1px solid #e6eaf0;
+            font-size: 9px;
+            color: #697586;
+        }
+
+        .confidential {
+            font-weight: 600;
         }
 
         @media print {
-            .no-print {
-                display: none
+            .payslip {
+                border: 0;
+            }
+
+            .payslip-header,
+            .net-salary-card {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
             }
         }
     </style>
 </head>
 
 <body>
-    <main class="payslip">
-        <h1>{{ company_name }}</h1>
-        <h2>Payslip — {{ period_label }}</h2>
-        <div class="panel">
-            <div class="row"><b>Employee</b><span>{{ employee.FullName }}</span></div>
-            <div class="row"><b>Employee Code</b><span>{{ employee.EmployeeCode }}</span></div>
-            <div class="row"><b>Designation</b><span>{{ employee.Designation or '—' }}</span></div>
-            <div class="row"><b>PAN</b><span>{{ employee.PAN or '—' }}</span></div>
-            <div class="row"><b>Working Days</b><span>{{ employee.WorkingDays }}</span></div>
-        </div>
-        <div class="grid">
-            <div class="panel">
-                <h3>Earnings</h3>
-                <div class="row"><span>Basic</span><b>{{ payroll.basic }}</b></div>
-                <div class="row"><span>HRA</span><b>{{ payroll.hra }}</b></div>
-                <div class="row"><span>Special Allowance</span><b>{{ payroll.special_allowance }}</b></div>
-                <div class="row"><span>LTA</span><b>{{ payroll.lta }}</b></div>
-                <div class="row"><span>Bonus</span><b>{{ payroll.bonus }}</b></div>
-                <div class="row total"><span>Gross</span><b>{{ payroll.gross_earnings }}</b></div>
-            </div>
-            <div class="panel">
-                <h3>Deductions</h3>
-                <div class="row"><span>Professional Tax</span><b>{{ payroll.professional_tax }}</b></div>
-                <div class="row"><span>EPF</span><b>{{ payroll.epf }}</b></div>
-                <div class="row"><span>TDS</span><b>{{ payroll.tds }}</b></div>
-                <div class="row total"><span>Total</span><b>{{ payroll.total_deductions }}</b></div>
-            </div>
-        </div>
-        <div class="net">Net Salary: {{ payroll.net_salary }}</div>
-    </main>
-</body>
 
+<main class="payslip">
+
+    <header class="payslip-header">
+
+        <div class="company-block">
+
+            <div class="company-logo">
+                PAY
+            </div>
+
+            <div>
+                <div class="company-name">
+                    {{ company_name }}
+                </div>
+
+                <div class="company-subtitle">
+                    Employee Payroll Statement
+                </div>
+            </div>
+
+        </div>
+
+        <div class="payslip-title">
+
+            <div class="payslip-label">
+                SALARY STATEMENT
+            </div>
+
+            <h1>Payslip</h1>
+
+            <div class="period">
+                {{ period_label }}
+            </div>
+
+        </div>
+
+    </header>
+
+    <section class="payslip-section">
+
+        <div class="section-heading">
+            <h2>Employee Information</h2>
+            <span>Employment and payroll details</span>
+        </div>
+
+        <div class="employee-grid">
+
+            <div class="info-item">
+                <span>Employee Name</span>
+                <strong>{{ employee.FullName }}</strong>
+            </div>
+
+            <div class="info-item">
+                <span>Employee Code</span>
+                <strong>{{ employee.EmployeeCode }}</strong>
+            </div>
+
+            <div class="info-item">
+                <span>Designation</span>
+                <strong>{{ employee.Designation or '—' }}</strong>
+            </div>
+
+            <div class="info-item">
+                <span>Department</span>
+                <strong>{{ employee.Department or '—' }}</strong>
+            </div>
+
+            <div class="info-item">
+                <span>PAN</span>
+                <strong>{{ employee.PAN or '—' }}</strong>
+            </div>
+
+            <div class="info-item">
+                <span>Joining Date</span>
+                <strong>
+                    {{ employee.JoiningDate or '—' }}
+                </strong>
+            </div>
+
+            <div class="info-item">
+                <span>Tax Regime</span>
+                <strong>{{ employee.RegimeOpted or 'New' }}</strong>
+            </div>
+
+            <div class="info-item">
+                <span>Working Days</span>
+                <strong>
+                    {{ payroll.working_days }}
+                    /
+                    {{ payroll.days_in_month }}
+                </strong>
+            </div>
+
+        </div>
+
+    </section>
+
+    <div class="salary-columns">
+
+        <section class="salary-card">
+
+            <div class="salary-card-header">
+                <h2>Earnings</h2>
+                <span>Salary components</span>
+            </div>
+
+            <div class="salary-lines">
+
+                <div class="salary-line">
+                    <span>Basic</span>
+                    <strong>{{ "%.2f"|format(payroll.basic|float) }}</strong>
+                </div>
+
+                <div class="salary-line">
+                    <span>HRA</span>
+                    <strong>{{ "%.2f"|format(payroll.hra|float) }}</strong>
+                </div>
+
+                <div class="salary-line">
+                    <span>Special Allowance</span>
+                    <strong>{{ "%.2f"|format(payroll.special_allowance|float) }}</strong>
+                </div>
+
+                <div class="salary-line">
+                    <span>LTA</span>
+                    <strong>{{ "%.2f"|format(payroll.lta|float) }}</strong>
+                </div>
+
+                <div class="salary-line">
+                    <span>Bonus</span>
+                    <strong>{{ "%.2f"|format(payroll.bonus|float) }}</strong>
+                </div>
+
+                <div class="salary-line total-line">
+                    <span>Gross Earnings</span>
+                    <strong>{{ "%.2f"|format(payroll.gross_earnings|float) }}</strong>
+                </div>
+
+            </div>
+
+        </section>
+
+        <section class="salary-card">
+
+            <div class="salary-card-header">
+                <h2>Deductions</h2>
+                <span>Statutory and tax deductions</span>
+            </div>
+
+            <div class="salary-lines">
+
+                <div class="salary-line">
+                    <span>Professional Tax</span>
+                    <strong>{{ "%.2f"|format(payroll.professional_tax|float) }}</strong>
+                </div>
+
+                <div class="salary-line">
+                    <span>EPF</span>
+                    <strong>{{ "%.2f"|format(payroll.epf|float) }}</strong>
+                </div>
+
+                <div class="salary-line">
+                    <span>TDS</span>
+                    <strong>{{ "%.2f"|format(payroll.tds|float) }}</strong>
+                </div>
+
+                <div class="salary-line total-line">
+                    <span>Total Deductions</span>
+                    <strong>{{ "%.2f"|format(payroll.total_deductions|float) }}</strong>
+                </div>
+
+            </div>
+
+        </section>
+
+    </div>
+
+    <section class="net-salary-card">
+
+        <div>
+            <span>Net Salary Payable</span>
+
+            <small>
+                Amount credited for {{ period_label }}
+            </small>
+        </div>
+
+        <strong>
+            ₹ {{ "%.2f"|format(payroll.net_salary|float) }}
+        </strong>
+
+    </section>
+
+    <section class="payslip-section">
+
+        <div class="section-heading">
+            <h2>Tax Summary</h2>
+            <span>Annual tax calculation summary</span>
+        </div>
+
+        <div class="tax-grid">
+
+            <div class="tax-item">
+                <span>Annual Taxable Salary</span>
+                <strong>
+                    ₹ {{ "%.2f"|format(tax.annual_taxable_salary|float) }}
+                </strong>
+            </div>
+
+            <div class="tax-item">
+                <span>Standard Deduction</span>
+                <strong>
+                    ₹ {{ "%.2f"|format(tax.standard_deduction|float) }}
+                </strong>
+            </div>
+
+            <div class="tax-item">
+                <span>Net Taxable Income</span>
+                <strong>
+                    ₹ {{ "%.2f"|format(tax.net_taxable_income|float) }}
+                </strong>
+            </div>
+
+            <div class="tax-item">
+                <span>Net Tax</span>
+                <strong>
+                    ₹ {{ "%.2f"|format(tax.net_tax|float) }}
+                </strong>
+            </div>
+
+        </div>
+
+    </section>
+
+    <footer class="payslip-footer">
+
+        <div>
+            Generated on:
+            {{ generated_at }}
+        </div>
+
+        <div class="confidential">
+            Confidential Payroll Document
+        </div>
+
+    </footer>
+
+</main>
+
+</body>
 </html>

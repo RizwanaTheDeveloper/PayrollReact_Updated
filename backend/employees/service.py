@@ -24,18 +24,73 @@ def get_employee(code):
     finally: cur.close(); c.close()
 
 def add_employee(**d):
-    c = get_connection(); cur = c.cursor()
+    c = get_connection()
+    cur = c.cursor()
+
     try:
-        cur.execute("""SELECT COALESCE(MAX(CASE WHEN EmployeeCode ~ '^EMP[0-9]+$' THEN CAST(SUBSTRING(EmployeeCode FROM 4) AS INTEGER) ELSE NULL END),0) FROM Employees""")
-        n = (cur.fetchone()[0] or 0) + 1
-        code = f'EMP{n:03d}'
-        cur.execute('''INSERT INTO Employees
-            (EmployeeCode,FullName,Department,Designation,JoiningDate,CTC,PAN,PFUAN,AccountNumber,IFSCCode,RegimeOpted,WorkingDays,IsActive)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1)''',
-            (code,d['full_name'],d['department'],d['designation'],d['joining_date'],d['ctc'],d['pan'],d['pf_uan'],d['account_number'],d['ifsc_code'],d['regime_opted'],d['working_days']))
-        c.commit(); return code
-    except Exception: c.rollback(); raise
-    finally: cur.close(); c.close()
+        code = str(d["employee_code"]).strip().upper()
+
+        # Check duplicate Employee Code
+        cur.execute(
+            "SELECT 1 FROM Employees WHERE EmployeeCode = %s",
+            (code,)
+        )
+
+        if cur.fetchone():
+            raise ValueError(
+                f"Employee code '{code}' already exists."
+            )
+
+        cur.execute(
+            """
+            INSERT INTO Employees
+            (
+                EmployeeCode,
+                FullName,
+                Department,
+                Designation,
+                JoiningDate,
+                CTC,
+                PAN,
+                PFUAN,
+                AccountNumber,
+                IFSCCode,
+                RegimeOpted,
+                WorkingDays,
+                IsActive
+            )
+            VALUES
+            (
+                %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, 1
+            )
+            """,
+            (
+                code,
+                d["full_name"],
+                d["department"],
+                d["designation"],
+                d["joining_date"],
+                d["ctc"],
+                d["pan"],
+                d["pf_uan"],
+                d["account_number"],
+                d["ifsc_code"],
+                d["regime_opted"],
+                d["working_days"],
+            ),
+        )
+
+        c.commit()
+        return code
+
+    except Exception:
+        c.rollback()
+        raise
+
+    finally:
+        cur.close()
+        c.close()
 
 def update_employee(code, **d):
     c = get_connection(); cur = c.cursor()
