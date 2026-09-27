@@ -1,5 +1,7 @@
+const API_BASE = "https://payrollreact-updated.onrender.com";
+
 const request = async (path, options = {}) => {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API_BASE}/api${path}`, {
     headers: {
       "Content-Type": "application/json",
     },
