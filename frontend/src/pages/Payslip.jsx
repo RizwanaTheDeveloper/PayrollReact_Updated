@@ -18,8 +18,10 @@ export default function Payslip() {
   const m = sp.get("month");
   const y = sp.get("year");
 
+  // PDF download must always target the Flask backend.
+  // The frontend Render service is not the PDF endpoint.
   const API_BASE =
-    import.meta.env.VITE_API_URL || "";
+    "https://payrollreact-updated.onrender.com";
 
   useEffect(() => {
     setD(null);
