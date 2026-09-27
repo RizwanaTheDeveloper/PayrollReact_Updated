@@ -1,2 +1,70 @@
-const request=async(path,options={})=>{const r=await fetch(`/api${path}`,{credentials:'include',headers:{'Content-Type':'application/json'},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||`Request failed (${r.status})`);return d};
-export const api={me:()=>request('/me'),login:(username,password)=>request('/login',{method:'POST',body:JSON.stringify({username,password})}),logout:()=>request('/logout',{method:'POST'}),getEmployees:()=>request('/employees'),getEmployee:code=>request(`/employees/${code}`),addEmployee:p=>request('/employees',{method:'POST',body:JSON.stringify(p)}),updateEmployee:(code,p)=>request(`/employees/${code}`,{method:'PUT',body:JSON.stringify(p)}),deleteEmployee:code=>request(`/employees/${code}`,{method:'DELETE'}),getPayslip:(code,month,year)=>{const q=new URLSearchParams();if(month)q.set('month',month);if(year)q.set('year',year);return request(`/payslip/${code}${q.toString()?`?${q}`:''}`)},getPayslipHistory:code=>request(`/payslip-history/${code}`)};
+const request = async (path, options = {}) => {
+  const response = await fetch(`/api${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+    },
+    ...options,
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || `Request failed (${response.status})`
+    );
+  }
+
+  return data;
+};
+
+export const api = {
+  login: (username, password) =>
+    request("/login", {
+      method: "POST",
+      body: JSON.stringify({
+        username,
+        password,
+      }),
+    }),
+
+  getEmployees: () =>
+    request("/employees"),
+
+  getEmployee: (code) =>
+    request(`/employees/${code}`),
+
+  addEmployee: (payload) =>
+    request("/employees", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateEmployee: (code, payload) =>
+    request(`/employees/${code}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteEmployee: (code) =>
+    request(`/employees/${code}`, {
+      method: "DELETE",
+    }),
+
+  getPayslip: (code, month, year) => {
+    const query = new URLSearchParams();
+
+    if (month) query.set("month", month);
+    if (year) query.set("year", year);
+
+    return request(
+      `/payslip/${code}${
+        query.toString()
+          ? `?${query.toString()}`
+          : ""
+      }`
+    );
+  },
+
+  getPayslipHistory: (code) =>
+    request(`/payslip-history/${code}`),
+};
