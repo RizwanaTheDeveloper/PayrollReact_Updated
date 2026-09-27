@@ -32,34 +32,41 @@ app.register_blueprint(payslips_bp)
 
 
 # BASIC REQUEST DEBUGGING
-# Use Flask/Gunicorn logging so the messages appear in Render Runtime Logs.
+# Print directly to stdout and also send through Flask logger.
 logging.basicConfig(level=logging.INFO)
 
 
 @app.before_request
 def log_request():
-    app.logger.warning(
-        "========== REQUEST =========="
+    message = (
+        f"========== REQUEST ==========
+"
+        f"METHOD={request.method}
+"
+        f"PATH={request.path}
+"
+        f"URL={request.url}"
     )
-    app.logger.warning(
-        "METHOD=%s PATH=%s URL=%s",
-        request.method,
-        request.path,
-        request.url,
-    )
+
+    print(message, flush=True)
+    app.logger.warning(message)
 
 
 @app.after_request
 def log_response(response):
-    app.logger.warning(
-        "========== RESPONSE =========="
+    message = (
+        f"========== RESPONSE ==========
+"
+        f"METHOD={request.method}
+"
+        f"PATH={request.path}
+"
+        f"STATUS={response.status}"
     )
-    app.logger.warning(
-        "METHOD=%s PATH=%s STATUS=%s",
-        request.method,
-        request.path,
-        response.status,
-    )
+
+    print(message, flush=True)
+    app.logger.warning(message)
+
     return response
 
 
