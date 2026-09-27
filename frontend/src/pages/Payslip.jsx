@@ -138,7 +138,7 @@ export default function Payslip() {
 
           <a
             className="btn primary"
-            href={`/download-payslip/${employeeCode}${
+            href={`https://payrollreact-updated.onrender.com/download-payslip/${employeeCode}${
               m && y
                 ? `?month=${m}&year=${y}`
                 : ""
