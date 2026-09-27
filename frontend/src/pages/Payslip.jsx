@@ -18,11 +18,6 @@ export default function Payslip() {
   const m = sp.get("month");
   const y = sp.get("year");
 
-  // PDF download must always target the Flask backend.
-  // The frontend Render service is not the PDF endpoint.
-  const API_BASE =
-    "https://payrollreact-updated.onrender.com";
-
   useEffect(() => {
     setD(null);
     setErr("");
@@ -33,9 +28,13 @@ export default function Payslip() {
       .catch((e) => setErr(e.message));
   }, [employeeCode, m, y]);
 
+  /* ---------------------------------------------------------
+     ERROR
+  --------------------------------------------------------- */
   if (err) {
     return (
       <section className="payslip-page">
+
         <div className="payslip-toolbar no-print">
           <button
             type="button"
@@ -50,13 +49,18 @@ export default function Payslip() {
         <div className="error box">
           {err}
         </div>
+
       </section>
     );
   }
 
+  /* ---------------------------------------------------------
+     LOADING
+  --------------------------------------------------------- */
   if (!d) {
     return (
       <section className="payslip-page">
+
         <div className="payslip-toolbar no-print">
           <button
             type="button"
@@ -71,6 +75,7 @@ export default function Payslip() {
         <div className="card">
           <p>Loading payslip...</p>
         </div>
+
       </section>
     );
   }
@@ -103,14 +108,12 @@ export default function Payslip() {
       year: "numeric",
     });
 
-  const downloadUrl =
-    `${API_BASE}/download-payslip/${employeeCode}` +
-    (m && y ? `?month=${m}&year=${y}` : "");
-
   return (
     <section className="payslip-page">
 
-      {/* TOOLBAR */}
+      {/* =====================================================
+          TOOLBAR
+      ===================================================== */}
       <div className="payslip-toolbar no-print">
 
         <button
@@ -135,7 +138,11 @@ export default function Payslip() {
 
           <a
             className="btn primary"
-            href={downloadUrl}
+            href={`/download-payslip/${employeeCode}${
+              m && y
+                ? `?month=${m}&year=${y}`
+                : ""
+            }`}
           >
             <i className="fa-solid fa-file-arrow-down" />
             Download PDF
@@ -144,7 +151,9 @@ export default function Payslip() {
         </div>
       </div>
 
-      {/* PAYSLIP */}
+      {/* =====================================================
+          PAYSLIP
+      ===================================================== */}
       <article className="payslip">
 
         {/* HEADER */}
@@ -157,6 +166,7 @@ export default function Payslip() {
             </div>
 
             <div>
+
               <div className="company-name">
                 {d.company_name}
               </div>
@@ -164,6 +174,7 @@ export default function Payslip() {
               <div className="company-subtitle">
                 Employee Payroll Statement
               </div>
+
             </div>
 
           </div>
@@ -174,7 +185,9 @@ export default function Payslip() {
               SALARY STATEMENT
             </div>
 
-            <h1>Payslip</h1>
+            <h1>
+              Payslip
+            </h1>
 
             <div className="period">
               {periodLabel}
@@ -184,7 +197,9 @@ export default function Payslip() {
 
         </header>
 
-        {/* EMPLOYEE INFORMATION */}
+        {/* =====================================================
+            EMPLOYEE INFORMATION
+        ===================================================== */}
         <section className="payslip-section">
 
           <div className="section-heading">
@@ -194,7 +209,10 @@ export default function Payslip() {
             </div>
 
             <div>
-              <h2>Employee Information</h2>
+              <h2>
+                Employee Information
+              </h2>
+
               <span>
                 Employment and payroll details
               </span>
@@ -205,42 +223,80 @@ export default function Payslip() {
           <div className="employee-grid">
 
             <div className="info-item">
-              <span>Employee Name</span>
-              <strong>{e.FullName}</strong>
+              <span>
+                Employee Name
+              </span>
+
+              <strong>
+                {e.FullName}
+              </strong>
             </div>
 
             <div className="info-item">
-              <span>Employee Code</span>
-              <strong>{e.EmployeeCode}</strong>
+              <span>
+                Employee Code
+              </span>
+
+              <strong>
+                {e.EmployeeCode}
+              </strong>
             </div>
 
             <div className="info-item">
-              <span>Designation</span>
-              <strong>{e.Designation || "—"}</strong>
+              <span>
+                Designation
+              </span>
+
+              <strong>
+                {e.Designation || "—"}
+              </strong>
             </div>
 
             <div className="info-item">
-              <span>Department</span>
-              <strong>{e.Department || "—"}</strong>
+              <span>
+                Department
+              </span>
+
+              <strong>
+                {e.Department || "—"}
+              </strong>
             </div>
 
             <div className="info-item">
-              <span>PAN</span>
-              <strong>{e.PAN || "—"}</strong>
+              <span>
+                PAN
+              </span>
+
+              <strong>
+                {e.PAN || "—"}
+              </strong>
             </div>
 
             <div className="info-item">
-              <span>Joining Date</span>
-              <strong>{formatDate(e.JoiningDate)}</strong>
+              <span>
+                Joining Date
+              </span>
+
+              <strong>
+                {formatDate(e.JoiningDate)}
+              </strong>
             </div>
 
             <div className="info-item">
-              <span>Tax Regime</span>
-              <strong>{e.RegimeOpted || "New"}</strong>
+              <span>
+                Tax Regime
+              </span>
+
+              <strong>
+                {e.RegimeOpted || "New"}
+              </strong>
             </div>
 
             <div className="info-item">
-              <span>Working Days</span>
+              <span>
+                Working Days
+              </span>
+
               <strong>
                 {workingDays} / {daysInMonth}
               </strong>
@@ -250,7 +306,9 @@ export default function Payslip() {
 
         </section>
 
-        {/* EARNINGS + DEDUCTIONS */}
+        {/* =====================================================
+            EARNINGS + DEDUCTIONS
+        ===================================================== */}
         <div className="salary-columns">
 
           {/* EARNINGS */}
@@ -263,8 +321,13 @@ export default function Payslip() {
               </div>
 
               <div>
-                <h2>Earnings</h2>
-                <span>Salary components</span>
+                <h2>
+                  Earnings
+                </h2>
+
+                <span>
+                  Salary components
+                </span>
               </div>
 
             </div>
@@ -282,16 +345,26 @@ export default function Payslip() {
                   className="salary-line"
                   key={label}
                 >
-                  <span>{label}</span>
-                  <strong>{formatINR(value)}</strong>
+                  <span>
+                    {label}
+                  </span>
+
+                  <strong>
+                    {formatINR(value)}
+                  </strong>
                 </div>
               ))}
 
               <div className="salary-line total-line">
-                <span>Gross Earnings</span>
+
+                <span>
+                  Gross Earnings
+                </span>
+
                 <strong>
                   {formatINR(p.gross_earnings)}
                 </strong>
+
               </div>
 
             </div>
@@ -308,7 +381,10 @@ export default function Payslip() {
               </div>
 
               <div>
-                <h2>Deductions</h2>
+                <h2>
+                  Deductions
+                </h2>
+
                 <span>
                   Statutory and tax deductions
                 </span>
@@ -327,16 +403,26 @@ export default function Payslip() {
                   className="salary-line"
                   key={label}
                 >
-                  <span>{label}</span>
-                  <strong>{formatINR(value)}</strong>
+                  <span>
+                    {label}
+                  </span>
+
+                  <strong>
+                    {formatINR(value)}
+                  </strong>
                 </div>
               ))}
 
               <div className="salary-line total-line">
-                <span>Total Deductions</span>
+
+                <span>
+                  Total Deductions
+                </span>
+
                 <strong>
                   {formatINR(p.total_deductions)}
                 </strong>
+
               </div>
 
             </div>
@@ -345,15 +431,21 @@ export default function Payslip() {
 
         </div>
 
-        {/* NET SALARY */}
+        {/* =====================================================
+            NET SALARY
+        ===================================================== */}
         <section className="net-salary-card">
 
           <div>
-            <span>Net Salary Payable</span>
+
+            <span>
+              Net Salary Payable
+            </span>
 
             <small>
               Amount credited for {periodLabel}
             </small>
+
           </div>
 
           <strong>
@@ -362,7 +454,9 @@ export default function Payslip() {
 
         </section>
 
-        {/* TAX SUMMARY */}
+        {/* =====================================================
+            TAX SUMMARY
+        ===================================================== */}
         <section className="payslip-section tax-section">
 
           <div className="section-heading">
@@ -372,10 +466,15 @@ export default function Payslip() {
             </div>
 
             <div>
-              <h2>Tax Summary</h2>
+
+              <h2>
+                Tax Summary
+              </h2>
+
               <span>
                 Annual tax calculation summary
               </span>
+
             </div>
 
           </div>
@@ -383,50 +482,80 @@ export default function Payslip() {
           <div className="tax-grid">
 
             <div className="tax-item">
-              <span>Annual Taxable Salary</span>
+
+              <span>
+                Annual Taxable Salary
+              </span>
+
               <strong>
                 {formatINR(t.annual_taxable_salary)}
               </strong>
+
             </div>
 
             <div className="tax-item">
-              <span>Standard Deduction</span>
+
+              <span>
+                Standard Deduction
+              </span>
+
               <strong>
                 {formatINR(t.standard_deduction)}
               </strong>
+
             </div>
 
             <div className="tax-item">
-              <span>Net Taxable Income</span>
+
+              <span>
+                Net Taxable Income
+              </span>
+
               <strong>
                 {formatINR(t.net_taxable_income)}
               </strong>
+
             </div>
 
             <div className="tax-item">
-              <span>Net Tax</span>
+
+              <span>
+                Net Tax
+              </span>
+
               <strong>
                 {formatINR(t.net_tax)}
               </strong>
+
             </div>
 
           </div>
 
         </section>
 
-        {/* FOOTER */}
+        {/* =====================================================
+            FOOTER
+        ===================================================== */}
         <footer className="payslip-footer">
 
           <div>
-            <strong>Generated on</strong>
+
+            <strong>
+              Generated on
+            </strong>
+
             <span>
               {d.generated_at || "—"}
             </span>
+
           </div>
 
           <div className="confidential">
+
             <i className="fa-solid fa-lock" />
+
             Confidential Payroll Document
+
           </div>
 
         </footer>

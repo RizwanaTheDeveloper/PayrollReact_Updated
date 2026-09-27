@@ -22,11 +22,7 @@ export default function PayslipHistory() {
   }, [employeeCode, notify]);
 
   if (err) {
-    return (
-      <div className="error box">
-        {err}
-      </div>
-    );
+    return <div className="error box">{err}</div>;
   }
 
   if (!d) {
@@ -35,29 +31,20 @@ export default function PayslipHistory() {
 
   return (
     <section className="card">
-
       <div className="page-head">
-
         <div>
-
           <small>Payslip History</small>
 
-          <h1>
-            {d.employee.FullName}
-          </h1>
+          <h1>{d.employee.FullName}</h1>
 
           <p>
             Select a payroll period to preview the complete payslip.
           </p>
-
         </div>
-
       </div>
 
       <div className="table-wrap">
-
         <table>
-
           <thead>
             <tr>
               <th>Pay Period</th>
@@ -67,16 +54,10 @@ export default function PayslipHistory() {
           </thead>
 
           <tbody>
-
             {d.periods.map((p) => (
-              <tr
-                key={`${p.year}-${p.month}`}
-              >
-
+              <tr key={`${p.year}-${p.month}`}>
                 <td>
-                  <strong>
-                    {p.label}
-                  </strong>
+                  <strong>{p.label}</strong>
                 </td>
 
                 <td>
@@ -86,7 +67,6 @@ export default function PayslipHistory() {
                 </td>
 
                 <td>
-
                   {p.has_snapshot ? (
                     <Link
                       className="history-preview-btn"
@@ -100,18 +80,13 @@ export default function PayslipHistory() {
                       Not available
                     </span>
                   )}
-
                 </td>
-
               </tr>
             ))}
-
           </tbody>
-
         </table>
-
       </div>
-
     </section>
   );
 }
+

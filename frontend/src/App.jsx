@@ -1,35 +1,24 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
-
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
-import Payroll from "./pages/Payroll";
 import Payslip from "./pages/Payslip";
+import PayslipHistory from "./pages/PayslipHistory";
 import NotFound from "./pages/NotFound";
 
 function Guard({ children, admin = false }) {
   const { user, checking } = useAuth();
-  const location = useLocation();
+  const loc = useLocation();
 
-  if (checking) {
-    return <p>Loading...</p>;
-  }
+  if (checking) return <p>Loading…</p>;
 
-  if (!user) {
-    return (
-      <Navigate
-        to="/login"
-        state={{ from: location.pathname }}
-        replace
-      />
-    );
-  }
+  if (!user)
+    return <Navigate to="/login" state={{ from: loc.pathname }} replace />;
 
-  if (admin && user.role !== "admin") {
+  if (admin && user.role !== "admin")
     return <Navigate to="/" replace />;
-  }
 
   return children;
 }
@@ -41,10 +30,7 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
 
-        <Route
-          path="/login"
-          element={<Login />}
-        />
+        <Route path="/login" element={<Login />} />
 
         <Route
           path="/"
@@ -73,17 +59,9 @@ export default function App() {
           }
         />
 
+        {/* PAYSLIP */}
         <Route
           path="/payroll/:employeeCode"
-          element={
-            <Guard>
-              <Payroll />
-            </Guard>
-          }
-        />
-
-        <Route
-          path="/payslips/:employeeCode"
           element={
             <Guard>
               <Payslip />
@@ -91,10 +69,17 @@ export default function App() {
           }
         />
 
+        {/* PAYSLIP HISTORY */}
         <Route
-          path="*"
-          element={<NotFound />}
+          path="/payslips/:employeeCode"
+          element={
+            <Guard>
+              <PayslipHistory />
+            </Guard>
+          }
         />
+
+        <Route path="*" element={<NotFound />} />
 
       </Route>
     </Routes>
