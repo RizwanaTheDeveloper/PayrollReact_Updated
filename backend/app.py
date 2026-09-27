@@ -39,12 +39,9 @@ logging.basicConfig(level=logging.INFO)
 @app.before_request
 def log_request():
     message = (
-        f"========== REQUEST ==========
-"
-        f"METHOD={request.method}
-"
-        f"PATH={request.path}
-"
+        "========== REQUEST ==========\n"
+        f"METHOD={request.method}\n"
+        f"PATH={request.path}\n"
         f"URL={request.url}"
     )
 
@@ -55,12 +52,9 @@ def log_request():
 @app.after_request
 def log_response(response):
     message = (
-        f"========== RESPONSE ==========
-"
-        f"METHOD={request.method}
-"
-        f"PATH={request.path}
-"
+        "========== RESPONSE ==========\n"
+        f"METHOD={request.method}\n"
+        f"PATH={request.path}\n"
         f"STATUS={response.status}"
     )
 
