@@ -19,7 +19,7 @@ from payslips.service import build_payslip_view
 
 
 bp = Blueprint(
-    "payslips",
+    "payslips_routes",
     __name__
 )
 
