@@ -14,13 +14,62 @@ import threading
 
 from employees.service import get_employee
 from payroll.history import list_payslip_periods
-from payslips.service import build_payslip_view
+from payslips.service import build_payslip_view, serialize_payslip
 
 
 bp = Blueprint(
-    "payslips",
+    "payroll_routes",
     __name__
 )
+
+
+@bp.get("/api/payslip/<code>")
+def api_payslip(code):
+
+    e = get_employee(code)
+
+    if not e:
+        return jsonify(
+            error="Employee not found."
+        ), 404
+
+    today = date.today()
+
+    month = (
+        request.args.get("month", type=int)
+        or today.month
+    )
+
+    year = (
+        request.args.get("year", type=int)
+        or today.year
+    )
+
+    if not 1 <= month <= 12:
+        return jsonify(
+            error="Month must be between 1 and 12."
+        ), 400
+
+    view = build_payslip_view(
+        e,
+        month,
+        year
+    )
+
+    if not view:
+        return jsonify(
+            error=(
+                "No payslip is on record for "
+                f"{date(year, month, 1).strftime('%B %Y')}."
+            )
+        ), 404
+
+    return jsonify(
+        serialize_payslip(
+            view,
+            company_name="5Gen Educon Private Limited"
+        )
+    )
 
 
 @bp.get("/api/payslip-history/<code>")
@@ -121,6 +170,7 @@ def _generate_pdf(html):
             async with async_playwright() as p:
 
                 browser = await p.chromium.launch(
+                    channel="chromium",
                     headless=True
                 )
 
@@ -134,7 +184,7 @@ def _generate_pdf(html):
 
                 await page.set_content(
                     html,
-                    wait_until="networkidle",
+                    wait_until="domcontentloaded",
                 )
 
                 await page.emulate_media(
