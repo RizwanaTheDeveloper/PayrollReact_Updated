@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 
 from auth.routes import auth_bp
@@ -28,6 +28,23 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(employees_bp)
 app.register_blueprint(payroll_bp)
 app.register_blueprint(payslips_bp)
+
+
+# BASIC REQUEST DEBUGGING
+@app.before_request
+def log_request():
+    print("========== REQUEST ==========", flush=True)
+    print("METHOD:", request.method, flush=True)
+    print("PATH:", request.path, flush=True)
+    print("URL:", request.url, flush=True)
+
+
+@app.after_request
+def log_response(response):
+    print("========== RESPONSE ==========", flush=True)
+    print("PATH:", request.path, flush=True)
+    print("STATUS:", response.status, flush=True)
+    return response
 
 
 @app.get("/health")
