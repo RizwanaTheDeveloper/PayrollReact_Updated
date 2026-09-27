@@ -4,4 +4,4 @@ python-dotenv>=1.0,<2
 playwright>=1.50,<2
 ReportLab
 gunicorn>=23,<24
-Flask-Cors>=5,<7gun
+Flask-Cors>=5,<7
