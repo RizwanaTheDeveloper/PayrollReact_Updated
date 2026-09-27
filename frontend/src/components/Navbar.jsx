@@ -8,10 +8,10 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const nav = useNavigate();
 
-  const handleLogout = async () => {
-    await logout();
-    nav("/login");
-  };
+const handleLogout = () => {
+  logout();
+  nav("/login");
+};
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur">

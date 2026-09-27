@@ -1,2 +1,40 @@
-import {createContext,useContext,useEffect,useState} from 'react';import {api} from '../services/api';
-const C=createContext(null);export function AuthProvider({children}){const[user,setUser]=useState(null),[checking,setChecking]=useState(true);useEffect(()=>{api.me().then(d=>setUser(d.user)).catch(()=>setUser(null)).finally(()=>setChecking(false))},[]);const login=async(u,p)=>{const d=await api.login(u,p);setUser(d.user);return d.user};const logout=async()=>{await api.logout();setUser(null)};return <C.Provider value={{user,checking,login,logout}}>{children}</C.Provider>}export const useAuth=()=>useContext(C);
+import { createContext, useContext, useState } from "react";
+import { api } from "../services/api";
+
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+const [user, setUser] = useState(null);
+
+const login = async (username, password) => {
+const data = await api.login(username, password);
+
+```
+setUser(data.user);
+
+return data.user;
+```
+
+};
+
+const logout = () => {
+setUser(null);
+};
+
+return (
+<AuthContext.Provider
+value={{
+user,
+checking: false,
+login,
+logout,
+}}
+>
+{children}
+</AuthContext.Provider>
+);
+}
+
+export function useAuth() {
+return useContext(AuthContext);
+}
