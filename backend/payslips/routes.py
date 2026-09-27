@@ -9,6 +9,8 @@ from flask import (
 
 from io import BytesIO
 from datetime import date
+import asyncio
+import threading
 
 from employees.service import get_employee
 from payroll.history import list_payslip_periods
@@ -99,6 +101,98 @@ def html_payslip(code):
     )
 
 
+def _generate_pdf(html):
+    """
+    Generate a PDF using Playwright's Async API.
+
+    Playwright is executed inside a separate thread so that
+    it does not conflict with an existing asyncio event loop.
+    """
+
+    result = {
+        "pdf": None,
+        "error": None,
+    }
+
+    def worker():
+
+        async def generate():
+
+            from playwright.async_api import async_playwright
+
+            async with async_playwright() as p:
+
+                browser = await p.chromium.launch(
+                    headless=True
+                )
+
+                try:
+
+                    page = await browser.new_page(
+                        viewport={
+                            "width": 1200,
+                            "height": 1600,
+                        },
+                        device_scale_factor=1,
+                    )
+
+                    await page.set_content(
+                        html,
+                        wait_until="networkidle",
+                    )
+
+                    await page.emulate_media(
+                        media="print"
+                    )
+
+                    pdf = await page.pdf(
+                        format="A4",
+                        print_background=True,
+                        prefer_css_page_size=True,
+                        margin={
+                            "top": "0",
+                            "right": "0",
+                            "bottom": "0",
+                            "left": "0",
+                        },
+                    )
+
+                    return pdf
+
+                finally:
+
+                    await browser.close()
+
+        try:
+
+            result["pdf"] = asyncio.run(
+                generate()
+            )
+
+        except Exception as exc:
+
+            result["error"] = exc
+
+    thread = threading.Thread(
+        target=worker
+    )
+
+    thread.start()
+    thread.join()
+
+    if result["error"]:
+
+        raise result["error"]
+
+    if not result["pdf"]:
+
+        raise RuntimeError(
+            "PDF generation returned empty data."
+        )
+
+    return result["pdf"]
+
+
 @bp.get("/download-payslip/<code>")
 def download(code):
 
@@ -122,6 +216,7 @@ def download(code):
     )
 
     if not 1 <= month <= 12:
+
         return jsonify(
             error="Month must be between 1 and 12."
         ), 400
@@ -133,6 +228,7 @@ def download(code):
     )
 
     if not view:
+
         return jsonify(
             error=(
                 "No payslip is on record for "
@@ -142,50 +238,13 @@ def download(code):
 
     try:
 
-        from playwright.sync_api import sync_playwright
-
         html = render_template(
             "payroll.html",
             **view,
             company_name="5Gen Educon Private Limited",
         )
 
-        with sync_playwright() as p:
-
-            browser = p.chromium.launch(
-                headless=True
-            )
-
-            page = browser.new_page(
-                viewport={
-                    "width": 1200,
-                    "height": 1600,
-                },
-                device_scale_factor=1,
-            )
-
-            page.set_content(
-                html,
-                wait_until="networkidle",
-            )
-
-            page.emulate_media(
-                media="print"
-            )
-
-            pdf = page.pdf(
-                format="A4",
-                print_background=True,
-                prefer_css_page_size=True,
-                margin={
-                    "top": "0",
-                    "right": "0",
-                    "bottom": "0",
-                    "left": "0",
-                },
-            )
-
-            browser.close()
+        pdf = _generate_pdf(html)
 
         return send_file(
             BytesIO(pdf),
