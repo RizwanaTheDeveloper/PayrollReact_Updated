@@ -1,4 +1,5 @@
 import os
+import logging
 from flask import Flask, request
 from flask_cors import CORS
 
@@ -31,19 +32,34 @@ app.register_blueprint(payslips_bp)
 
 
 # BASIC REQUEST DEBUGGING
+# Use Flask/Gunicorn logging so the messages appear in Render Runtime Logs.
+logging.basicConfig(level=logging.INFO)
+
+
 @app.before_request
 def log_request():
-    print("========== REQUEST ==========", flush=True)
-    print("METHOD:", request.method, flush=True)
-    print("PATH:", request.path, flush=True)
-    print("URL:", request.url, flush=True)
+    app.logger.warning(
+        "========== REQUEST =========="
+    )
+    app.logger.warning(
+        "METHOD=%s PATH=%s URL=%s",
+        request.method,
+        request.path,
+        request.url,
+    )
 
 
 @app.after_request
 def log_response(response):
-    print("========== RESPONSE ==========", flush=True)
-    print("PATH:", request.path, flush=True)
-    print("STATUS:", response.status, flush=True)
+    app.logger.warning(
+        "========== RESPONSE =========="
+    )
+    app.logger.warning(
+        "METHOD=%s PATH=%s STATUS=%s",
+        request.method,
+        request.path,
+        response.status,
+    )
     return response
 
 
