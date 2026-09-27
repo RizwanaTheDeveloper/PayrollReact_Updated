@@ -14,15 +14,46 @@ app = Flask(
     template_folder="templates"
 )
 
-frontend_url = os.getenv(
+configured_origins = os.getenv(
     "FRONTEND_URL",
-    "http://localhost:5173"
+    ""
 )
+
+allowed_origins = [
+    origin.strip().rstrip("/")
+    for origin in configured_origins.split(",")
+    if origin.strip()
+]
+
+# Keep the known production frontend origins allowed while Render
+# environment variables are being migrated between deployments.
+allowed_origins.extend([
+    "https://payroll-est9.onrender.com",
+    "https://payrollreact-updated-1.onrender.com",
+])
+
+# Local development.
+allowed_origins.append("http://localhost:5173")
+
+allowed_origins = list(dict.fromkeys(allowed_origins))
 
 CORS(
     app,
-    origins=[frontend_url],
-    supports_credentials=False
+    origins=allowed_origins,
+    methods=[
+        "GET",
+        "HEAD",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "OPTIONS",
+    ],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+    ],
+    supports_credentials=False,
 )
 
 app.register_blueprint(auth_bp)
