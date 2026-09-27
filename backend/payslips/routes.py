@@ -13,6 +13,10 @@ import asyncio
 import threading
 import os
 
+# Keep Playwright browser binaries inside the deployed Python environment.
+# Render builds and runtime then use the exact same browser location.
+os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "0")
+
 from employees.service import get_employee
 from payroll.history import list_payslip_periods
 from payslips.service import build_payslip_view
@@ -135,6 +139,7 @@ def _generate_pdf(html):
                 print("PDF DEBUG: launching Chromium...", flush=True)
 
                 browser = await p.chromium.launch(
+                    channel="chromium",
                     headless=True
                 )
 
