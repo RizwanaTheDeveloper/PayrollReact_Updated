@@ -1,72 +1,102 @@
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
 
-const request = async (path, options = {}) => {
-  const response = await fetch(`/api${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-    },
-    ...options,
-  });
+import Layout from "./components/Layout";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import Employees from "./pages/Employees";
+import Payroll from "./pages/Payroll";
+import Payslip from "./pages/Payslip";
+import NotFound from "./pages/NotFound";
 
-  const data = await response.json().catch(() => ({}));
+function Guard({ children, admin = false }) {
+  const { user, checking } = useAuth();
+  const location = useLocation();
 
-  if (!response.ok) {
-    throw new Error(
-      data.error || `Request failed (${response.status})`
+  if (checking) {
+    return <p>Loading...</p>;
+  }
+
+  if (!user) {
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: location.pathname }}
+        replace
+      />
     );
   }
 
-  return data;
-};
+  if (admin && user.role !== "admin") {
+    return <Navigate to="/" replace />;
+  }
 
-export const api = {
-  login: (username, password) =>
-    request("/login", {
-      method: "POST",
-      body: JSON.stringify({
-        username,
-        password,
-      }),
-    }),
+  return children;
+}
 
-  getEmployees: () =>
-    request("/employees"),
+export default function App() {
+  const { user } = useAuth();
 
-  getEmployee: (code) =>
-    request(`/employees/${code}`),
+  return (
+    <Routes>
+      <Route element={<Layout />}>
 
-  addEmployee: (payload) =>
-    request("/employees", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+        <Route
+          path="/login"
+          element={<Login />}
+        />
 
-  updateEmployee: (code, payload) =>
-    request(`/employees/${code}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    }),
+        <Route
+          path="/"
+          element={
+            <Guard>
+              <Dashboard user={user} />
+            </Guard>
+          }
+        />
 
-  deleteEmployee: (code) =>
-    request(`/employees/${code}`, {
-      method: "DELETE",
-    }),
+        <Route
+          path="/employees/new"
+          element={
+            <Guard admin>
+              <Employees />
+            </Guard>
+          }
+        />
 
-  getPayslip: (code, month, year) => {
-    const query = new URLSearchParams();
+        <Route
+          path="/employees/:employeeCode/edit"
+          element={
+            <Guard admin>
+              <Employees />
+            </Guard>
+          }
+        />
 
-    if (month) query.set("month", month);
-    if (year) query.set("year", year);
+        <Route
+          path="/payroll/:employeeCode"
+          element={
+            <Guard>
+              <Payroll />
+            </Guard>
+          }
+        />
 
-    return request(
-      `/payslip/${code}${
-        query.toString()
-          ? `?${query.toString()}`
-          : ""
-      }`
-    );
-  },
+        <Route
+          path="/payslips/:employeeCode"
+          element={
+            <Guard>
+              <Payslip />
+            </Guard>
+          }
+        />
 
-  getPayslipHistory: (code) =>
-    request(`/payslip-history/${code}`),
-};
+        <Route
+          path="*"
+          element={<NotFound />}
+        />
 
+      </Route>
+    </Routes>
+  );
+}
