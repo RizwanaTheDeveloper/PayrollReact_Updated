@@ -103,7 +103,9 @@ export default function Payslip() {
           </button>
           <a
             className="btn primary"
-            href={`/download-payslip/${employeeCode}${
+            href={`${
+              import.meta.env.DEV ? "" : import.meta.env.VITE_API_URL
+            }/download-payslip/${employeeCode}${
               m && y ? `?month=${m}&year=${y}` : ""
             }`}
           >
