@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../services/api";
 import { formatINR, formatDate } from "../utils/format";
 
@@ -34,22 +30,14 @@ export default function Payslip() {
   if (err) {
     return (
       <section className="payslip-page">
-
         <div className="payslip-toolbar no-print">
-          <button
-            type="button"
-            className="btn"
-            onClick={() => navigate(-1)}
-          >
+          <button type="button" className="btn" onClick={() => navigate(-1)}>
             <i className="fa-solid fa-arrow-left" />
             Back
           </button>
         </div>
 
-        <div className="error box">
-          {err}
-        </div>
-
+        <div className="error box">{err}</div>
       </section>
     );
   }
@@ -60,13 +48,8 @@ export default function Payslip() {
   if (!d) {
     return (
       <section className="payslip-page">
-
         <div className="payslip-toolbar no-print">
-          <button
-            type="button"
-            className="btn"
-            onClick={() => navigate(-1)}
-          >
+          <button type="button" className="btn" onClick={() => navigate(-1)}>
             <i className="fa-solid fa-arrow-left" />
             Back
           </button>
@@ -75,26 +58,20 @@ export default function Payslip() {
         <div className="card">
           <p>Loading payslip...</p>
         </div>
-
       </section>
     );
   }
 
-  const {
-    employee: e,
-    payroll: p,
-    tax: t,
-  } = d;
+  const { employee: e, payroll: p, tax: t } = d;
 
-  const workingDays =
-    p.working_days ?? e.WorkingDays ?? 0;
+  const workingDays = p.working_days ?? e.WorkingDays ?? 0;
 
   const daysInMonth =
     p.days_in_month ??
     new Date(
       Number(y || new Date().getFullYear()),
       Number(m || new Date().getMonth() + 1),
-      0
+      0,
     ).getDate();
 
   const periodLabel =
@@ -102,7 +79,7 @@ export default function Payslip() {
     new Date(
       Number(y || new Date().getFullYear()),
       Number(m || new Date().getMonth()),
-      1
+      1,
     ).toLocaleDateString("en-IN", {
       month: "long",
       year: "numeric",
@@ -110,44 +87,29 @@ export default function Payslip() {
 
   return (
     <section className="payslip-page">
-
       {/* =====================================================
           TOOLBAR
       ===================================================== */}
       <div className="payslip-toolbar no-print">
-
-        <button
-          type="button"
-          className="btn"
-          onClick={() => navigate(-1)}
-        >
+        <button type="button" className="btn" onClick={() => navigate(-1)}>
           <i className="fa-solid fa-arrow-left" />
           Back
         </button>
 
         <div className="actions">
-
-          <button
-            type="button"
-            className="btn"
-            onClick={() => window.print()}
-          >
+          <button type="button" className="btn" onClick={() => window.print()}>
             <i className="fa-solid fa-print" />
             Print
           </button>
-
           <a
             className="btn primary"
-            href={`https://payrollreact-updated.onrender.com/download-payslip/${employeeCode}${
-              m && y
-                ? `?month=${m}&year=${y}`
-                : ""
+            href={`/download-payslip/${employeeCode}${
+              m && y ? `?month=${m}&year=${y}` : ""
             }`}
           >
             <i className="fa-solid fa-file-arrow-down" />
             Download PDF
           </a>
-
         </div>
       </div>
 
@@ -155,185 +117,117 @@ export default function Payslip() {
           PAYSLIP
       ===================================================== */}
       <article className="payslip">
-
         {/* HEADER */}
         <header className="payslip-header">
-
           <div className="company-block">
-
             <div className="company-logo">
               <i className="fa-solid fa-building" />
             </div>
 
             <div>
+              <div className="company-name">{d.company_name}</div>
 
-              <div className="company-name">
-                {d.company_name}
-              </div>
-
-              <div className="company-subtitle">
-                Employee Payroll Statement
-              </div>
-
+              <div className="company-subtitle">Employee Payroll Statement</div>
             </div>
-
           </div>
 
           <div className="payslip-title">
+            <div className="payslip-label">SALARY STATEMENT</div>
 
-            <div className="payslip-label">
-              SALARY STATEMENT
-            </div>
+            <h1>Payslip</h1>
 
-            <h1>
-              Payslip
-            </h1>
-
-            <div className="period">
-              {periodLabel}
-            </div>
-
+            <div className="period">{periodLabel}</div>
           </div>
-
         </header>
 
         {/* =====================================================
             EMPLOYEE INFORMATION
         ===================================================== */}
         <section className="payslip-section">
-
           <div className="section-heading">
-
             <div className="section-icon">
               <i className="fa-solid fa-user" />
             </div>
 
             <div>
-              <h2>
-                Employee Information
-              </h2>
+              <h2>Employee Information</h2>
 
-              <span>
-                Employment and payroll details
-              </span>
+              <span>Employment and payroll details</span>
             </div>
-
           </div>
 
           <div className="employee-grid">
-
             <div className="info-item">
-              <span>
-                Employee Name
-              </span>
+              <span>Employee Name</span>
 
-              <strong>
-                {e.FullName}
-              </strong>
+              <strong>{e.FullName}</strong>
             </div>
 
             <div className="info-item">
-              <span>
-                Employee Code
-              </span>
+              <span>Employee Code</span>
 
-              <strong>
-                {e.EmployeeCode}
-              </strong>
+              <strong>{e.EmployeeCode}</strong>
             </div>
 
             <div className="info-item">
-              <span>
-                Designation
-              </span>
+              <span>Designation</span>
 
-              <strong>
-                {e.Designation || "—"}
-              </strong>
+              <strong>{e.Designation || "—"}</strong>
             </div>
 
             <div className="info-item">
-              <span>
-                Department
-              </span>
+              <span>Department</span>
 
-              <strong>
-                {e.Department || "—"}
-              </strong>
+              <strong>{e.Department || "—"}</strong>
             </div>
 
             <div className="info-item">
-              <span>
-                PAN
-              </span>
+              <span>PAN</span>
 
-              <strong>
-                {e.PAN || "—"}
-              </strong>
+              <strong>{e.PAN || "—"}</strong>
             </div>
 
             <div className="info-item">
-              <span>
-                Joining Date
-              </span>
+              <span>Joining Date</span>
 
-              <strong>
-                {formatDate(e.JoiningDate)}
-              </strong>
+              <strong>{formatDate(e.JoiningDate)}</strong>
             </div>
 
             <div className="info-item">
-              <span>
-                Tax Regime
-              </span>
+              <span>Tax Regime</span>
 
-              <strong>
-                {e.RegimeOpted || "New"}
-              </strong>
+              <strong>{e.RegimeOpted || "New"}</strong>
             </div>
 
             <div className="info-item">
-              <span>
-                Working Days
-              </span>
+              <span>Working Days</span>
 
               <strong>
                 {workingDays} / {daysInMonth}
               </strong>
             </div>
-
           </div>
-
         </section>
 
         {/* =====================================================
             EARNINGS + DEDUCTIONS
         ===================================================== */}
         <div className="salary-columns">
-
           {/* EARNINGS */}
           <section className="salary-card">
-
             <div className="salary-card-header earnings-header">
-
               <div className="salary-card-icon">
                 <i className="fa-solid fa-arrow-trend-up" />
               </div>
 
               <div>
-                <h2>
-                  Earnings
-                </h2>
+                <h2>Earnings</h2>
 
-                <span>
-                  Salary components
-                </span>
+                <span>Salary components</span>
               </div>
-
             </div>
 
             <div className="salary-lines">
-
               {[
                 ["Basic", p.basic],
                 ["HRA", p.hra],
@@ -341,227 +235,129 @@ export default function Payslip() {
                 ["LTA", p.lta],
                 ["Bonus", p.bonus],
               ].map(([label, value]) => (
-                <div
-                  className="salary-line"
-                  key={label}
-                >
-                  <span>
-                    {label}
-                  </span>
+                <div className="salary-line" key={label}>
+                  <span>{label}</span>
 
-                  <strong>
-                    {formatINR(value)}
-                  </strong>
+                  <strong>{formatINR(value)}</strong>
                 </div>
               ))}
 
               <div className="salary-line total-line">
+                <span>Gross Earnings</span>
 
-                <span>
-                  Gross Earnings
-                </span>
-
-                <strong>
-                  {formatINR(p.gross_earnings)}
-                </strong>
-
+                <strong>{formatINR(p.gross_earnings)}</strong>
               </div>
-
             </div>
-
           </section>
 
           {/* DEDUCTIONS */}
           <section className="salary-card">
-
             <div className="salary-card-header deductions-header">
-
               <div className="salary-card-icon">
                 <i className="fa-solid fa-arrow-trend-down" />
               </div>
 
               <div>
-                <h2>
-                  Deductions
-                </h2>
+                <h2>Deductions</h2>
 
-                <span>
-                  Statutory and tax deductions
-                </span>
+                <span>Statutory and tax deductions</span>
               </div>
-
             </div>
 
             <div className="salary-lines">
-
               {[
                 ["Professional Tax", p.professional_tax],
                 ["EPF", p.epf],
                 ["TDS", p.tds],
               ].map(([label, value]) => (
-                <div
-                  className="salary-line"
-                  key={label}
-                >
-                  <span>
-                    {label}
-                  </span>
+                <div className="salary-line" key={label}>
+                  <span>{label}</span>
 
-                  <strong>
-                    {formatINR(value)}
-                  </strong>
+                  <strong>{formatINR(value)}</strong>
                 </div>
               ))}
 
               <div className="salary-line total-line">
+                <span>Total Deductions</span>
 
-                <span>
-                  Total Deductions
-                </span>
-
-                <strong>
-                  {formatINR(p.total_deductions)}
-                </strong>
-
+                <strong>{formatINR(p.total_deductions)}</strong>
               </div>
-
             </div>
-
           </section>
-
         </div>
 
         {/* =====================================================
             NET SALARY
         ===================================================== */}
         <section className="net-salary-card">
-
           <div>
+            <span>Net Salary Payable</span>
 
-            <span>
-              Net Salary Payable
-            </span>
-
-            <small>
-              Amount credited for {periodLabel}
-            </small>
-
+            <small>Amount credited for {periodLabel}</small>
           </div>
 
-          <strong>
-            {formatINR(p.net_salary)}
-          </strong>
-
+          <strong>{formatINR(p.net_salary)}</strong>
         </section>
 
         {/* =====================================================
             TAX SUMMARY
         ===================================================== */}
         <section className="payslip-section tax-section">
-
           <div className="section-heading">
-
             <div className="section-icon">
               <i className="fa-solid fa-file-invoice-dollar" />
             </div>
 
             <div>
+              <h2>Tax Summary</h2>
 
-              <h2>
-                Tax Summary
-              </h2>
-
-              <span>
-                Annual tax calculation summary
-              </span>
-
+              <span>Annual tax calculation summary</span>
             </div>
-
           </div>
 
           <div className="tax-grid">
-
             <div className="tax-item">
+              <span>Annual Taxable Salary</span>
 
-              <span>
-                Annual Taxable Salary
-              </span>
-
-              <strong>
-                {formatINR(t.annual_taxable_salary)}
-              </strong>
-
+              <strong>{formatINR(t.annual_taxable_salary)}</strong>
             </div>
 
             <div className="tax-item">
+              <span>Standard Deduction</span>
 
-              <span>
-                Standard Deduction
-              </span>
-
-              <strong>
-                {formatINR(t.standard_deduction)}
-              </strong>
-
+              <strong>{formatINR(t.standard_deduction)}</strong>
             </div>
 
             <div className="tax-item">
+              <span>Net Taxable Income</span>
 
-              <span>
-                Net Taxable Income
-              </span>
-
-              <strong>
-                {formatINR(t.net_taxable_income)}
-              </strong>
-
+              <strong>{formatINR(t.net_taxable_income)}</strong>
             </div>
 
             <div className="tax-item">
+              <span>Net Tax</span>
 
-              <span>
-                Net Tax
-              </span>
-
-              <strong>
-                {formatINR(t.net_tax)}
-              </strong>
-
+              <strong>{formatINR(t.net_tax)}</strong>
             </div>
-
           </div>
-
         </section>
 
         {/* =====================================================
             FOOTER
         ===================================================== */}
         <footer className="payslip-footer">
-
           <div>
+            <strong>Generated on</strong>
 
-            <strong>
-              Generated on
-            </strong>
-
-            <span>
-              {d.generated_at || "—"}
-            </span>
-
+            <span>{d.generated_at || "—"}</span>
           </div>
 
           <div className="confidential">
-
             <i className="fa-solid fa-lock" />
-
             Confidential Payroll Document
-
           </div>
-
         </footer>
-
       </article>
-
     </section>
   );
 }

@@ -1,4 +1,4 @@
-const API_BASE = "https://payrollreact-updated.onrender.com";
+const API_BASE = "";
 
 const request = async (path, options = {}) => {
   const response = await fetch(`${API_BASE}/api${path}`, {
