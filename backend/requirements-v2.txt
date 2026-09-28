@@ -1,0 +1,11 @@
+Flask>=3.1,<4
+Flask-Cors>=5,<7
+psycopg[binary]>=3.2,<4
+python-dotenv>=1.0,<2
+PyJWT>=2.10,<3
+bcrypt>=4.2,<5
+pydantic>=2.10,<3
+reportlab>=4.2,<5
+playwright==1.63.0
+gunicorn>=23,<24
+openpyxl>=3.1,<4
