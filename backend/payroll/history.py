@@ -14,6 +14,7 @@ def get_month_record(code,month,year):
 def record_month(code,month,year,monthly_tds,snapshot=None):
     c=get_connection();cur=c.cursor()
     try:
+        
         cur.execute('INSERT INTO PayrollHistory (EmployeeCode,PayMonth,PayYear,MonthlyTDS,Snapshot) VALUES (%s,%s,%s,%s,%s)',(code,month,year,monthly_tds,json.dumps(snapshot) if snapshot is not None else None));c.commit()
     except Exception:c.rollback();raise
     finally:cur.close();c.close()

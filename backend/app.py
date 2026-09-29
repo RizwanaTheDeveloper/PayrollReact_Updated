@@ -8,6 +8,11 @@ from employees.routes import bp as employees_bp
 from payroll.routes import bp as payroll_bp
 from payslips.routes import bp as payslips_bp
 
+from attendance.routes import bp as attendance_bp
+
+
+app.register_blueprint(attendance_bp) # type: ignore
+
 
 app = Flask(
     __name__,
