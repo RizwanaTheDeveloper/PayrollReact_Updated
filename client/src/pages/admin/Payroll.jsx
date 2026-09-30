@@ -13,6 +13,8 @@ import {
   FiPlus,
 } from 'react-icons/fi';
 
+import { FaRupeeSign } from 'react-icons/fa';
+
 const MONTHS = [
   'January',
   'February',
@@ -711,7 +713,7 @@ export default function Payroll() {
         <div className="payroll-title-wrap">
           <h1 className="payroll-title">
             <span className="payroll-title-icon">
-              <FiDollarSign size={21} />
+              <FaRupeeSign size={21} />
             </span>
 
             Payroll
@@ -823,7 +825,7 @@ export default function Payroll() {
               </label>
 
               <div className="payroll-field-icon">
-                <FiDollarSign size={16} />
+                <FaRupeeSign size={16} />
 
                 <input
                   type="number"

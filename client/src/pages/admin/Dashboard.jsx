@@ -15,7 +15,7 @@ import {
   FiInbox,
   FiAlertCircle
 } from 'react-icons/fi';
-
+import { FaRupeeSign } from 'react-icons/fa';
 
 const money = (v) =>
   v == null
@@ -123,7 +123,7 @@ export default function Dashboard() {
     {
       label: 'Monthly Payroll',
       value: money(s.monthlyPayroll),
-      icon: FiDollarSign,
+      icon: FaRupeeSign,
       color: 'purple',
       to: '/admin/payroll'
     }

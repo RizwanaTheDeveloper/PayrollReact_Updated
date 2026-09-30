@@ -6,9 +6,20 @@ const { authenticate, authorize } = require('../middleware/auth');
 
 router.use(authenticate, authorize('admin'));
 
-const TEXT  = ['emp_code', 'name', 'designation', 'department', 'gender', 'pan', 'pf_uan', 'account_number', 'ifsc_code'];
+const TEXT = [
+  'emp_code',
+  'name',
+  'email',
+  'designation',
+  'department',
+  'gender',
+  'pan',
+  'pf_uan',
+  'account_number',
+  'ifsc_code',
+];
 const DATES = ['dob', 'joining_date', 'resignation_date'];
-const NUMS  = ['ctc', 'basic', 'hra', 'special_allowance', 'lta', 'other_allowances'];
+const NUMS = ['ctc', 'basic', 'hra', 'special_allowance', 'lta', 'other_allowances'];
 
 const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
 
@@ -23,7 +34,13 @@ function clean(body) {
   for (const k of TEXT) {
     if (!(k in body)) continue;
     let s = body[k] == null ? '' : String(body[k]).trim();
-    if (['emp_code', 'pan', 'ifsc_code'].includes(k)) s = s.toUpperCase();
+    if (['emp_code', 'pan', 'ifsc_code'].includes(k)) {
+      s = s.toUpperCase();
+    }
+
+    if (k === 'email') {
+      s = s.toLowerCase();
+    }
     v[k] = s || null;
   }
   for (const k of DATES) {
@@ -108,7 +125,7 @@ router.post('/', asyncHandler(async (req, res) => {
   }
 }));
 
-// PUT /api/employees/:id  (email is not editable; password is optional)
+// PUT /api/employees/:id  (email & password are editable)
 router.put('/:id', asyncHandler(async (req, res) => {
   const body = req.body || {};
   const { values, error } = clean(body);

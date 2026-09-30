@@ -8,23 +8,51 @@ router.use(authenticate);
 
 const num = (v) => Number(v) || 0;
 
-// GET /api/payslips/my
-// Employee: only their own payslips
+/* =========================================================
+   GET /api/payslips/my
+   Employee: view their own payslips
+   ========================================================= */
+
 router.get(
   '/my',
   asyncHandler(async (req, res) => {
     const { rows } = await pool.query(
       `SELECT
-        id,
-        month,
-        year,
-        basic,
-        allowances,
-        deductions,
-        net_pay
-       FROM payslips
-       WHERE employee_id = $1
-       ORDER BY year DESC, month DESC`,
+        p.*,
+
+        e.name,
+        e.email,
+        e.emp_code,
+        e.designation,
+        e.gender,
+        e.dob,
+        e.pan,
+        e.pf_uan,
+        e.account_number,
+        e.ifsc_code,
+        e.tax_regime,
+        e.joining_date::text AS joining_date,
+        e.resignation_date::text AS resignation_date,
+
+        e.ctc,
+        e.basic,
+        e.hra,
+        e.special_allowance,
+        e.lta,
+        e.other_allowances,
+
+        e.is_active
+
+       FROM payslips p
+
+       JOIN employees e
+         ON e.id = p.employee_id
+
+       WHERE p.employee_id = $1
+
+       ORDER BY
+         p.year DESC,
+         p.month DESC`,
       [req.user.id]
     );
 
@@ -32,13 +60,21 @@ router.get(
   })
 );
 
-// GET /api/payslips?month=&year=&employee_id=
-// Admin: view payslips
+
+/* =========================================================
+   GET /api/payslips?month=&year=&employee_id=
+   Admin: view payslips
+   ========================================================= */
+
 router.get(
   '/',
   authorize('admin'),
   asyncHandler(async (req, res) => {
-    const { month, year, employee_id } = req.query;
+    const {
+      month,
+      year,
+      employee_id
+    } = req.query;
 
     const where = [];
     const vals = [];
@@ -61,12 +97,21 @@ router.get(
     const { rows } = await pool.query(
       `SELECT
         p.*,
+
         e.name,
-        e.emp_code
+        e.email,
+        e.emp_code,
+        e.designation
+
        FROM payslips p
+
        JOIN employees e
          ON e.id = p.employee_id
-       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+
+       ${where.length
+         ? 'WHERE ' + where.join(' AND ')
+         : ''}
+
        ORDER BY
          p.year DESC,
          p.month DESC,
@@ -78,17 +123,12 @@ router.get(
   })
 );
 
-// POST /api/payslips/generate
-// Admin: generate payslips
-//
-// Body:
-// {
-//   month,
-//   year,
-//   allowances?,
-//   deductions?,
-//   employee_id?
-// }
+
+/* =========================================================
+   POST /api/payslips/generate
+   Admin: generate payslips
+   ========================================================= */
+
 router.post(
   '/generate',
   authorize('admin'),
@@ -103,85 +143,142 @@ router.post(
       ? Number(req.body.employee_id)
       : null;
 
+    /* ---------- Validation ---------- */
+
     if (
       !(month >= 1 && month <= 12) ||
       !(year >= 2000 && year <= 2100)
     ) {
       return res.status(400).json({
-        message: 'Valid month (1-12) and year are required'
+        message:
+          'Valid month (1-12) and year are required'
       });
     }
 
     if (extra < 0 || ded < 0) {
       return res.status(400).json({
-        message: 'Amounts cannot be negative'
+        message:
+          'Amounts cannot be negative'
       });
     }
 
+    /* ---------- Eligible employees ---------- */
+
     const ELIGIBLE = `
       e.role = 'employee'
+
       AND e.is_active
-      AND ($1::int IS NULL OR e.id = $1::int)
+
+      AND (
+        $1::int IS NULL
+        OR e.id = $1::int
+      )
+
       AND (
         e.joining_date IS NULL
         OR e.joining_date <
-          make_date($3::int, $2::int, 1) + interval '1 month'
+          make_date(
+            $3::int,
+            $2::int,
+            1
+          ) + interval '1 month'
       )
+
       AND (
         e.resignation_date IS NULL
         OR e.resignation_date >=
-          make_date($3::int, $2::int, 1)
+          make_date(
+            $3::int,
+            $2::int,
+            1
+          )
       )
     `;
 
+    /* ---------- Employees without salary ---------- */
+
     const noSalary = await pool.query(
-      `SELECT COUNT(*)::int AS n
+      `SELECT
+        COUNT(*)::int AS n
+
        FROM employees e
+
        WHERE ${ELIGIBLE}
-         AND e.basic <= 0`,
-      [only, month, year]
+
+       AND e.basic <= 0`,
+      [
+        only,
+        month,
+        year
+      ]
     );
+
+
+    /* ---------- Generate payslips ---------- */
 
     const { rowCount } = await pool.query(
       `INSERT INTO payslips (
         employee_id,
         month,
         year,
+
         basic,
         hra,
         special_allowance,
         lta,
         other_allowances,
+
         allowances,
         deductions,
         net_pay
       )
+
       SELECT
         e.id,
+
         $2::int,
         $3::int,
+
         e.basic,
         e.hra,
         e.special_allowance,
         e.lta,
-        e.other_allowances + $4::numeric,
-        e.hra
+
+        e.other_allowances
+          + $4::numeric,
+
+        (
+          e.hra
           + e.special_allowance
           + e.lta
           + e.other_allowances
-          + $4::numeric,
+          + $4::numeric
+        ),
+
         $5::numeric,
-        e.basic
+
+        (
+          e.basic
           + e.hra
           + e.special_allowance
           + e.lta
           + e.other_allowances
           + $4::numeric
           - $5::numeric
+        )
+
       FROM employees e
+
       WHERE ${ELIGIBLE}
-        AND e.basic > 0
-      ON CONFLICT (employee_id, year, month)
+
+      AND e.basic > 0
+
+      ON CONFLICT (
+        employee_id,
+        year,
+        month
+      )
+
       DO NOTHING`,
       [
         only,
@@ -194,104 +291,145 @@ router.post(
 
     res.status(201).json({
       generated: rowCount,
+
       skippedNoSalary:
         noSalary.rows[0].n
     });
   })
 );
 
-// DELETE /api/payslips/:id
-// Admin: remove a payslip so it can be regenerated
+
+/* =========================================================
+   DELETE /api/payslips/:id
+   Admin: delete payslip
+   ========================================================= */
+
 router.delete(
   '/:id',
   authorize('admin'),
   asyncHandler(async (req, res) => {
-    const { rowCount } = await pool.query(
-      `DELETE FROM payslips
-       WHERE id = $1`,
-      [req.params.id]
-    );
+    const { rowCount } =
+      await pool.query(
+        `DELETE FROM payslips
+         WHERE id = $1`,
+        [req.params.id]
+      );
 
     if (!rowCount) {
       return res.status(404).json({
-        message: 'Payslip not found'
+        message:
+          'Payslip not found'
       });
     }
 
     res.json({
-      message: 'Deleted'
+      message:
+        'Payslip deleted successfully'
     });
   })
 );
 
-// GET /api/payslips/:id/download
-// Owner or admin: generate PDF using utils/payslipPdf.js
+
+/* =========================================================
+   GET /api/payslips/:id/download
+   Owner or Admin: download PDF
+   ========================================================= */
+
 router.get(
   '/:id/download',
   asyncHandler(async (req, res) => {
-    const { rows } = await pool.query(
-      `SELECT
-        p.*,
-        e.name,
-        e.email,
-        e.designation,
-        e.department,
-        e.emp_code,
-        e.pan,
-        e.pf_uan,
-        e.account_number,
-        e.joining_date::text AS joining_date
-      FROM payslips p
-      JOIN employees e
-        ON e.id = p.employee_id
-      WHERE p.id = $1`,
-      [req.params.id]
-    );
+
+    const { rows } =
+      await pool.query(
+        `SELECT
+          p.*,
+
+          e.name,
+          e.email,
+          e.emp_code,
+
+          e.designation,
+          e.gender,
+
+          e.dob,
+          e.pan,
+          e.pf_uan,
+
+          e.account_number,
+          e.ifsc_code,
+
+          e.tax_regime,
+
+          e.joining_date::text
+            AS joining_date,
+
+          e.resignation_date::text
+            AS resignation_date,
+
+          e.ctc,
+
+          e.basic,
+          e.hra,
+          e.special_allowance,
+          e.lta,
+          e.other_allowances,
+
+          e.is_active
+
+         FROM payslips p
+
+         JOIN employees e
+           ON e.id = p.employee_id
+
+         WHERE p.id = $1`,
+        [req.params.id]
+      );
+
+
+    /* ---------- Payslip not found ---------- */
 
     if (!rows.length) {
       return res.status(404).json({
-        message: 'Payslip not found'
+        message:
+          'Payslip not found'
       });
     }
 
+
     const payslip = rows[0];
 
-    // Make the existing payslipPdf.js compatible with
-    // the fields currently available in the database.
-    payslip.travel_allowance = 0;
-    payslip.leave_allowance = 0;
-    payslip.bonus = 0;
-    payslip.professional_tax = 0;
-    payslip.pf = 0;
 
-    // Existing database fields
-    // are used where possible.
-    payslip.travel_allowance = Number(payslip.lta || 0);
+    /* =====================================================
+       Authorization
 
-    payslip.leave_allowance = 0;
-    payslip.bonus = 0;
+       Admin can download any payslip.
 
-    // If deductions contains the complete deduction amount,
-    // use it as the payslip deduction amount.
-    payslip.professional_tax = 0;
-    payslip.pf = Number(payslip.deductions || 0);
+       Employee can download only
+       their own payslip.
+       ===================================================== */
 
-    // Existing account information
-    // payslipPdf.js will mask the account number.
-    payslip.account_number = payslip.account_number || '';
+    if (
+      req.user.role !== 'admin' &&
+      Number(payslip.employee_id) !==
+        Number(req.user.id)
+    ) {
+      return res.status(403).json({
+        message:
+          'You are not authorized to download this payslip'
+      });
+    }
 
-    // These fields are not currently present in the database.
-    payslip.bank_name = '';
-    payslip.gender = '';
-    payslip.location = '';
-    payslip.dob = '';
-    payslip.uan = payslip.pf_uan || '';
-    payslip.resignation_date = '';
-    payslip.month_days = 0;
-    payslip.net_paid_days = 0;
 
-    return generatePayslipPdf(res, payslip);
+    /* =====================================================
+       Generate PDF
+       ===================================================== */
+
+    return generatePayslipPdf(
+      res,
+      payslip
+    );
   })
 );
+
 
 module.exports = router;

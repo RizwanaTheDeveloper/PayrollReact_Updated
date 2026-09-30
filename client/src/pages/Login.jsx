@@ -853,7 +853,6 @@ export default function Login() {
 
           transform: translateY(-50%);
 
-          width: 32px;
           height: 32px;
 
           border: none;

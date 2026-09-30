@@ -19,6 +19,8 @@ import {
   FiUsers,
 } from 'react-icons/fi';
 
+import { FaRupeeSign } from 'react-icons/fa';
+
 const salaryKeys = [
   'basic',
   'hra',
@@ -141,7 +143,7 @@ export default function Employees() {
 
       showToast(
         error.response?.data?.message ||
-          'Failed to load employees.',
+        'Failed to load employees.',
         'error'
       );
     } finally {
@@ -374,6 +376,12 @@ export default function Employees() {
     return payload;
   };
 
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -411,7 +419,7 @@ export default function Employees() {
 
       showToast(
         error.response?.data?.message ||
-          'Failed to save employee.',
+        'Failed to save employee.',
         'error'
       );
     } finally {
@@ -437,15 +445,14 @@ export default function Employees() {
 
       showToast(
         error.response?.data?.message ||
-          'Failed to delete employee.',
+        'Failed to delete employee.',
         'error'
       );
     }
   };
 
   const fieldClass = (fieldName) =>
-    `employee-input ${
-      errors[fieldName] ? 'has-error' : ''
+    `employee-input ${errors[fieldName] ? 'has-error' : ''
     }`;
 
   return (
@@ -1215,6 +1222,7 @@ export default function Employees() {
         <form
           className="employee-form-card"
           onSubmit={handleSubmit}
+          onKeyDown={handleKeyDown}
         >
           <div className="employee-form-top">
             <div>
@@ -1370,9 +1378,8 @@ export default function Employees() {
                     name="gender"
                     value={form.gender}
                     onChange={handleChange}
-                    className={`employee-select ${
-                      errors.gender ? 'has-error' : ''
-                    }`}
+                    className={`employee-select ${errors.gender ? 'has-error' : ''
+                      }`}
                   >
                     <option value="">
                       Select gender
@@ -1510,7 +1517,7 @@ export default function Employees() {
             {/* SALARY */}
             <div className="employee-section">
               <SectionHeader
-                icon={<FiDollarSign size={18} />}
+                icon={<FaRupeeSign size={18} />}
                 title="Salary & Tax"
                 description="CTC and monthly salary structure"
               />
@@ -1563,7 +1570,7 @@ export default function Employees() {
               <div style={{ height: 18 }} />
 
               <SectionHeader
-                icon={<FiDollarSign size={18} />}
+                icon={<FaRupeeSign size={18} />}
                 title="Monthly Salary Structure"
                 description="Enter the monthly salary components"
               />
@@ -1679,8 +1686,8 @@ export default function Employees() {
                 {saving
                   ? 'Saving...'
                   : editingId
-                  ? 'Update Employee'
-                  : 'Save Employee'}
+                    ? 'Update Employee'
+                    : 'Save Employee'}
               </button>
             </div>
           </div>
