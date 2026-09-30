@@ -1262,6 +1262,7 @@ export default function Payroll() {
                 )}
               </button>
 
+              {/*
               <button
                 type="submit"
                 value="update"
@@ -1275,6 +1276,7 @@ export default function Payroll() {
                 <FiEdit2 />
                 Update Payslip
               </button>
+              */}
             </div>
           </form>
         </div>
