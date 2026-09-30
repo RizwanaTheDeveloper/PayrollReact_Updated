@@ -216,7 +216,7 @@ export default function Employees() {
 
       showToast(
         error.response?.data?.message ||
-          'Failed to load employees.',
+        'Failed to load employees.',
         'error'
       );
     } finally {
@@ -549,7 +549,7 @@ export default function Employees() {
     salaryKeys.forEach((key) => {
       payload[key] =
         form[key] === '' ||
-        form[key] === null
+          form[key] === null
           ? 0
           : Number(form[key]);
     });
@@ -560,7 +560,7 @@ export default function Employees() {
     deductionKeys.forEach((key) => {
       payload[key] =
         form[key] === '' ||
-        form[key] === null
+          form[key] === null
           ? 0
           : Number(form[key]);
     });
@@ -630,7 +630,7 @@ export default function Employees() {
 
       showToast(
         error.response?.data?.message ||
-          'Failed to save employee.',
+        'Failed to save employee.',
         'error'
       );
     } finally {
@@ -660,17 +660,16 @@ export default function Employees() {
 
       showToast(
         error.response?.data?.message ||
-          'Failed to delete employee.',
+        'Failed to delete employee.',
         'error'
       );
     }
   };
 
   const fieldClass = (fieldName) =>
-    `employee-input ${
-      errors[fieldName]
-        ? 'has-error'
-        : ''
+    `employee-input ${errors[fieldName]
+      ? 'has-error'
+      : ''
     }`;
 
   return (
@@ -1608,11 +1607,10 @@ export default function Employees() {
                     name="gender"
                     value={form.gender}
                     onChange={handleChange}
-                    className={`employee-select ${
-                      errors.gender
-                        ? 'has-error'
-                        : ''
-                    }`}
+                    className={`employee-select ${errors.gender
+                      ? 'has-error'
+                      : ''
+                      }`}
                   >
                     <option value="">
                       Select gender
@@ -2039,7 +2037,8 @@ export default function Employees() {
 
             <thead>
               <tr>
-                <th>ID</th>
+                {/* <th>ID</th> */}
+                <th>Employee ID</th>
                 <th>Employee</th>
                 <th>Email</th>
                 <th>Designation</th>
@@ -2089,110 +2088,101 @@ export default function Employees() {
                   </td>
                 </tr>
               ) : (
-                filteredEmployees.map((employee) => (
-                  <tr key={employee.id}>
+                [...filteredEmployees]
+                  .sort((a, b) =>
+                    String(a.emp_code || '').localeCompare(
+                      String(b.emp_code || ''),
+                      undefined,
+                      { numeric: true }
+                    )
+                  )
+                  .map((employee) => (
+                    <tr key={employee.id}>
 
-                    <td>
-                      <span className="employee-id">
-                        #{employee.id}
-                      </span>
-                    </td>
+                      <td>
+                        <span className="employee-id">
+                          {employee.emp_code || '-'}
+                        </span>
+                      </td>
 
-                    <td>
-                      <div className="employee-name-cell">
+                      <td>
+                        <div className="employee-name-cell">
 
-                        <div className="employee-avatar">
-                          <FiUser size={16} />
-                        </div>
-
-                        <div className="employee-name-content">
-
-                          <div className="employee-name">
-                            {employee.name || '-'}
+                          <div className="employee-avatar">
+                            <FiUser size={16} />
                           </div>
 
-                          <div className="employee-code">
-                            {employee.emp_code || '-'}
+                          <div className="employee-name-content">
+
+                            <div className="employee-name">
+                              {employee.name || '-'}
+                            </div>
+
+                            <div className="employee-code">
+                              {employee.emp_code || '-'}
+                            </div>
+
                           </div>
 
                         </div>
+                      </td>
 
-                      </div>
-                    </td>
-
-                    <td>
-                      <span
-                        className="employee-email"
-                        title={employee.email || ''}
-                      >
-                        {employee.email || '-'}
-                      </span>
-                    </td>
-
-                    <td>
-                      <span
-                        className="employee-designation"
-                        title={
-                          employee.designation || ''
-                        }
-                      >
-                        {employee.designation || '-'} 
-                      </span>
-                    </td>
-
-                    <td>
-                      <span className="employee-ctc">
-                        {money(employee.ctc)}
-                      </span>
-                    </td>
-
-                    <td>
-                      <div className="employee-actions">
-
-                        <button
-                          type="button"
-                          className="employee-action-btn employee-edit-btn"
-                          onClick={() =>
-                            openEditForm(employee)
-                          }
-                          title={`Edit ${
-                            employee.name ||
-                            'employee'
-                          }`}
-                          aria-label={`Edit ${
-                            employee.name ||
-                            'employee'
-                          }`}
+                      <td>
+                        <span
+                          className="employee-email"
+                          title={employee.email || ''}
                         >
-                          <FiEdit2 size={14} />
-                          <span>Edit</span>
-                        </button>
+                          {employee.email || '-'}
+                        </span>
+                      </td>
 
-                        <button
-                          type="button"
-                          className="employee-action-btn employee-delete-btn"
-                          onClick={() =>
-                            handleDelete(employee)
-                          }
-                          title={`Delete ${
-                            employee.name ||
-                            'employee'
-                          }`}
-                          aria-label={`Delete ${
-                            employee.name ||
-                            'employee'
-                          }`}
+                      <td>
+                        <span
+                          className="employee-designation"
+                          title={employee.designation || ''}
                         >
-                          <FiTrash2 size={14} />
-                          <span>Delete</span>
-                        </button>
+                          {employee.designation || '-'}
+                        </span>
+                      </td>
 
-                      </div>
-                    </td>
+                      <td>
+                        <span className="employee-ctc">
+                          {money(employee.ctc)}
+                        </span>
+                      </td>
 
-                  </tr>
-                ))
-              )}
+                      <td>
+                        <div className="employee-actions">
+
+                          <button
+                            type="button"
+                            className="employee-action-btn employee-edit-btn"
+                            onClick={() => openEditForm(employee)}
+                            title={`Edit ${employee.name || 'employee'}`}
+                            aria-label={`Edit ${employee.name || 'employee'}`}
+                          >
+                            <FiEdit2 size={14} />
+                            <span>Edit</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="employee-action-btn employee-delete-btn"
+                            onClick={() => handleDelete(employee)}
+                            title={`Delete ${employee.name || 'employee'}`}
+                            aria-label={`Delete ${employee.name || 'employee'}`}
+                          >
+                            <FiTrash2 size={14} />
+                            <span>Delete</span>
+                          </button>
+
+                        </div>
+                      </td>
+
+                    </tr>
+                  ))
+              )
+              }
 
             </tbody>
 
