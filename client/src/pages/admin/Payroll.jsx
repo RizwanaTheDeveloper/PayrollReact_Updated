@@ -59,7 +59,6 @@ export default function Payroll() {
     month: now.getMonth() + 1,
     year: now.getFullYear(),
     allowances: 0,
-    deductions: 0,
   });
 
   // =========================================================
@@ -195,10 +194,6 @@ export default function Payroll() {
       allowances: existingPayslip
         ? num(existingPayslip.allowances)
         : 0,
-
-      deductions: existingPayslip
-        ? num(existingPayslip.deductions)
-        : 0,
     }));
   }, [
     selectedEmployee,
@@ -254,8 +249,7 @@ export default function Payroll() {
 
     const totalDeductions =
       salary.epf +
-      salary.professional_tax +
-      num(form.deductions);
+      salary.professional_tax;
 
     const netPay =
       gross - totalDeductions;
@@ -265,7 +259,7 @@ export default function Payroll() {
       totalDeductions,
       netPay,
     };
-  }, [salary, form.allowances, form.deductions]);
+  }, [salary, form.allowances]);
 
   // =========================================================
   // CHANGE
@@ -325,13 +319,6 @@ export default function Payroll() {
       return;
     }
 
-    if (num(form.deductions) < 0) {
-      setError(
-        'Additional deduction cannot be negative.'
-      );
-      return;
-    }
-
     if (
       form.employee_id &&
       !selectedEmployee
@@ -365,7 +352,7 @@ export default function Payroll() {
 
           // Only monthly adjustments are entered here.
           allowances: num(form.allowances),
-          deductions: num(form.deductions),
+          deductions: 0,
         }
       );
 
@@ -1435,17 +1422,6 @@ export default function Payroll() {
 
                   <div className="calc-row deduction">
                     <span>
-                      Additional Deduction
-                    </span>
-                    <strong>
-                      -{money(
-                        form.deductions
-                      )}
-                    </strong>
-                  </div>
-
-                  <div className="calc-row deduction">
-                    <span>
                       Total Deductions
                     </span>
                     <strong>
@@ -1524,7 +1500,6 @@ export default function Payroll() {
                   <th>Basic</th>
                   <th>EPF</th>
                   <th>Professional Tax</th>
-                  <th>Additional Deduction</th>
                   <th>Net Pay</th>
                   <th>PDF</th>
                 </tr>
@@ -1570,12 +1545,6 @@ export default function Payroll() {
                       <td>
                         {money(
                           payslip.professional_tax
-                        )}
-                      </td>
-
-                      <td>
-                        {money(
-                          payslip.deductions
                         )}
                       </td>
 

@@ -69,13 +69,9 @@ const getAllowances = (p) => {
 };
 
 const getDeductions = (p) => {
-  if (p.deductions !== undefined && p.deductions !== null) {
-    return Number(p.deductions) || 0;
-  }
-
   return (
     Number(p.professional_tax || 0) +
-    Number(p.pf || 0)
+    Number(p.epf || 0)
   );
 };
 

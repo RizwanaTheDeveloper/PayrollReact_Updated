@@ -184,9 +184,7 @@ router.post(
       req.body?.allowances
     );
 
-    const additionalDeduction = num(
-      req.body?.deductions
-    );
+    const additionalDeduction = 0;
 
     const mode = String(
       req.body?.mode || 'generate'

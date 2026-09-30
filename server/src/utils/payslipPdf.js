@@ -751,10 +751,6 @@ module.exports = (res, p) => {
       'Professional Tax',
       p.professional_tax,
     ],
-    [
-      'Additional Deduction',
-      p.deductions,
-    ],
   ];
 
   const totalEarnings =

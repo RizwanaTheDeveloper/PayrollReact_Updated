@@ -96,6 +96,42 @@ const money = (value) => {
   })}`;
 };
 
+const buildSalaryFromCtc = (ctcValue) => {
+  const annualCtc = Number(ctcValue);
+
+  if (!Number.isFinite(annualCtc) || annualCtc <= 0) {
+    return {
+      basic: '',
+      hra: '',
+      special_allowance: '',
+      lta: '',
+      other_allowances: '',
+    };
+  }
+
+  const monthlyCtc = annualCtc / 12;
+  const basic = monthlyCtc * 0.4;
+  const hra = basic * 0.5;
+  const specialAllowance = basic * 0.2;
+  const lta = basic * 0.1;
+  const otherAllowances =
+    monthlyCtc -
+    basic -
+    hra -
+    specialAllowance -
+    lta;
+
+  const round2 = (value) => Number(value.toFixed(2));
+
+  return {
+    basic: String(round2(basic)),
+    hra: String(round2(hra)),
+    special_allowance: String(round2(specialAllowance)),
+    lta: String(round2(lta)),
+    other_allowances: String(round2(otherAllowances)),
+  };
+};
+
 function Toast({ toast, onClose }) {
   if (!toast) return null;
 
@@ -417,6 +453,45 @@ export default function Employees() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
+
+    if (name === 'ctc') {
+      const nextCtc = value;
+
+      setForm((previous) => {
+        const nextForm = {
+          ...previous,
+          ctc: nextCtc,
+        };
+
+        if (
+          nextCtc === '' ||
+          Number(nextCtc) <= 0
+        ) {
+          return {
+            ...nextForm,
+            basic: '',
+            hra: '',
+            special_allowance: '',
+            lta: '',
+            other_allowances: '',
+          };
+        }
+
+        return {
+          ...nextForm,
+          ...buildSalaryFromCtc(nextCtc),
+        };
+      });
+
+      if (errors[name]) {
+        setErrors((previous) => ({
+          ...previous,
+          [name]: '',
+        }));
+      }
+
+      return;
+    }
 
     setForm((previous) => ({
       ...previous,
