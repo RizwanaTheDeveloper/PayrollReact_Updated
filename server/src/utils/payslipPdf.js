@@ -2,6 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
 
+// =========================================================
+// FILES / COMPANY
+// =========================================================
+
 const LOGO_PATH = path.join(
   __dirname,
   '..',
@@ -11,6 +15,10 @@ const LOGO_PATH = path.join(
 
 const COMPANY_ADDRESS =
   process.env.COMPANY_ADDRESS || '';
+
+// =========================================================
+// MONTHS
+// =========================================================
 
 const MONTHS = [
   'January',
@@ -24,58 +32,159 @@ const MONTHS = [
   'September',
   'October',
   'November',
-  'December'
+  'December',
 ];
 
-const num = (v) => Number(v) || 0;
+// =========================================================
+// HELPERS
+// =========================================================
 
-const pad = (n) =>
-  String(n).padStart(2, '0');
+const num = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
 
-const inr = (n) =>
-  num(n).toLocaleString('en-IN', {
+const pad = (value) =>
+  String(value).padStart(2, '0');
+
+const inr = (value) =>
+  num(value).toLocaleString('en-IN', {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
   });
 
-const mask = (s) =>
-  s
-    ? 'X'.repeat(
-        Math.max(
-          String(s).length - 4,
-          0
-        )
-      ) +
-      String(s).slice(-4)
-    : '-';
+const isEmpty = (value) =>
+  value === null ||
+  value === undefined ||
+  value === '';
 
-const isEmpty = (v) =>
-  v === null ||
-  v === undefined ||
-  v === '';
-
-const fmtDate = (v) => {
-  if (!v) return '-';
-
-  const s =
-    v instanceof Date
-      ? v.toLocaleDateString('en-CA')
-      : String(v).slice(0, 10);
-
-  const [y, m, d] = s.split('-');
-
-  if (!y || !m || !d) {
+const mask = (value) => {
+  if (isEmpty(value)) {
     return '-';
   }
 
-  return `${d} ${
-    MONTHS[Number(m) - 1]?.slice(0, 3) || ''
-  } ${y}`;
+  const text = String(value);
+
+  if (text.length <= 4) {
+    return text;
+  }
+
+  return (
+    'X'.repeat(text.length - 4) +
+    text.slice(-4)
+  );
 };
 
-/* =========================================================
-   Amount in words - Indian numbering system
-   ========================================================= */
+// =========================================================
+// DATE FORMAT
+// =========================================================
+//
+// Converts:
+// 2026-07-01
+// 2026-07-01T00:00:00.000Z
+// Date object
+//
+// Into:
+// 01 Jul 2026
+//
+// Using the date portion directly avoids timezone
+// shifting the date by one day.
+// =========================================================
+
+const formatDate = (value) => {
+  if (isEmpty(value)) {
+    return '-';
+  }
+
+  let year;
+  let month;
+  let day;
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      return '-';
+    }
+
+    year = value.getFullYear();
+    month = value.getMonth() + 1;
+    day = value.getDate();
+  } else {
+    const text = String(value);
+
+    const match = text.match(
+      /^(\d{4})-(\d{2})-(\d{2})/
+    );
+
+    if (match) {
+      year = Number(match[1]);
+      month = Number(match[2]);
+      day = Number(match[3]);
+    } else {
+      const date = new Date(value);
+
+      if (Number.isNaN(date.getTime())) {
+        return '-';
+      }
+
+      year = date.getFullYear();
+      month = date.getMonth() + 1;
+      day = date.getDate();
+    }
+  }
+
+  if (
+    !year ||
+    !month ||
+    !day ||
+    month < 1 ||
+    month > 12
+  ) {
+    return '-';
+  }
+
+  return `${pad(day)} ${
+    MONTHS[month - 1].slice(0, 3)
+  } ${year}`;
+};
+
+// =========================================================
+// TAX REGIME
+// =========================================================
+
+const formatTaxRegime = (value) => {
+  if (isEmpty(value)) {
+    return '-';
+  }
+
+  const regime = String(value)
+    .trim()
+    .toLowerCase();
+
+  if (regime === 'new') {
+    return 'New Regime';
+  }
+
+  if (regime === 'old') {
+    return 'Old Regime';
+  }
+
+  return String(value);
+};
+
+// =========================================================
+// EMPLOYEE STATUS
+// =========================================================
+
+const formatStatus = (value) => {
+  return value === true
+    ? 'Active'
+    : 'Inactive';
+};
+
+// =========================================================
+// AMOUNT IN WORDS
+// INDIAN NUMBERING SYSTEM
+// =========================================================
 
 const ONES = [
   '',
@@ -97,7 +206,7 @@ const ONES = [
   'Sixteen',
   'Seventeen',
   'Eighteen',
-  'Nineteen'
+  'Nineteen',
 ];
 
 const TENS = [
@@ -110,28 +219,41 @@ const TENS = [
   'Sixty',
   'Seventy',
   'Eighty',
-  'Ninety'
+  'Ninety',
 ];
 
-const twoDigits = (n) =>
-  n < 20
-    ? ONES[n]
-    : TENS[Math.floor(n / 10)] +
-      (n % 10
-        ? ` ${ONES[n % 10]}`
-        : '');
+const twoDigits = (n) => {
+  n = Math.floor(num(n));
+
+  if (n <= 0) {
+    return '';
+  }
+
+  if (n < 20) {
+    return ONES[n];
+  }
+
+  return (
+    TENS[Math.floor(n / 10)] +
+    (n % 10
+      ? ` ${ONES[n % 10]}`
+      : '')
+  );
+};
 
 const threeDigits = (n) => {
-  const h = Math.floor(n / 100);
-  const r = n % 100;
+  n = Math.floor(num(n));
+
+  const hundreds = Math.floor(n / 100);
+  const remainder = n % 100;
 
   return [
-    h
-      ? `${ONES[h]} Hundred`
+    hundreds
+      ? `${ONES[hundreds]} Hundred`
       : '',
-    r
-      ? twoDigits(r)
-      : ''
+    remainder
+      ? twoDigits(remainder)
+      : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -144,20 +266,14 @@ const inWords = (value) => {
     return 'Zero';
   }
 
-  const crore =
-    Math.floor(n / 1e7);
+  const crore = Math.floor(n / 10000000);
+  n %= 10000000;
 
-  n %= 1e7;
+  const lakh = Math.floor(n / 100000);
+  n %= 100000;
 
-  const lakh =
-    Math.floor(n / 1e5);
-
-  n %= 1e5;
-
-  const thousand =
-    Math.floor(n / 1e3);
-
-  n %= 1e3;
+  const thousand = Math.floor(n / 1000);
+  n %= 1000;
 
   return [
     crore
@@ -174,41 +290,60 @@ const inWords = (value) => {
 
     n
       ? threeDigits(n)
-      : ''
+      : '',
   ]
     .filter(Boolean)
     .join(' ');
 };
 
-const netWords = (amount) => {
-  const paise =
-    Math.round(num(amount) * 100);
+const netWords = (value) => {
+  const amount = Math.round(
+    num(value) * 100
+  );
 
-  const rupees =
-    Math.floor(paise / 100);
+  const rupees = Math.floor(
+    amount / 100
+  );
 
-  const ps =
-    paise % 100;
+  const paise = amount % 100;
 
   return `Rupees ${inWords(rupees)}${
-    ps
-      ? ` and ${twoDigits(ps)} Paise`
+    paise
+      ? ` and ${twoDigits(paise)} Paise`
       : ''
   } Only`;
 };
 
-/* =========================================================
-   PDF
-   ========================================================= */
+// =========================================================
+// PDF EXPORT
+// =========================================================
 
 module.exports = (res, p) => {
   const month = Number(p.month);
   const year = Number(p.year);
 
+  const monthName =
+    MONTHS[month - 1] || '';
+
+  const lastDay = new Date(
+    year,
+    month,
+    0
+  ).getDate();
+
+  // =======================================================
+  // CREATE PDF
+  // =======================================================
+
   const doc = new PDFDocument({
     size: 'A4',
-    margin: 40
+    margin: 40,
+    bufferPages: true,
   });
+
+  // =======================================================
+  // RESPONSE HEADERS
+  // =======================================================
 
   res.setHeader(
     'Content-Type',
@@ -224,59 +359,72 @@ module.exports = (res, p) => {
 
   doc.pipe(res);
 
-  const pageW =
-    doc.page.width;
+  const pageW = doc.page.width;
 
   const left = 40;
 
   const contentW =
     pageW - left * 2;
 
-  let y = 30;
+  let y = 28;
 
-  /* =======================================================
-     Table cell helper
-     ======================================================= */
+  // =======================================================
+  // TABLE CELL HELPER
+  // =======================================================
 
   const cell = (
     x,
     cy,
-    w,
-    h,
+    width,
+    height,
     text,
-    o = {}
+    options = {}
   ) => {
-    if (o.fill) {
+    const fill =
+      options.fill || null;
+
+    const color =
+      options.color || '#0f172a';
+
+    const bold =
+      options.bold || false;
+
+    const size =
+      options.size || 9;
+
+    const align =
+      options.align || 'left';
+
+    if (fill) {
       doc
+        .save()
         .rect(
           x,
           cy,
-          w,
-          h
+          width,
+          height
         )
-        .fill(o.fill);
+        .fill(fill)
+        .restore();
     }
 
     doc
+      .save()
       .rect(
         x,
         cy,
-        w,
-        h
+        width,
+        height
       )
       .lineWidth(0.5)
       .strokeColor('#cbd5e1')
-      .stroke();
-
-    const size =
-      o.size || 9.5;
+      .stroke()
+      .restore();
 
     doc
-      .fillColor(
-        o.color || '#0f172a'
-      )
+      .fillColor(color)
       .font(
-        o.bold
+        bold
           ? 'Helvetica-Bold'
           : 'Helvetica'
       )
@@ -284,20 +432,19 @@ module.exports = (res, p) => {
       .text(
         String(text ?? ''),
         x + 8,
-        cy + (h - size) / 2 - 1,
+        cy + (height - size) / 2 - 1,
         {
-          width: w - 16,
-          height: h - 6,
+          width: width - 16,
+          height: height - 6,
           ellipsis: true,
-          align:
-            o.align || 'left'
+          align,
         }
       );
   };
 
-  /* =======================================================
-     1. Logo
-     ======================================================= */
+  // =======================================================
+  // 1. COMPANY LOGO
+  // =======================================================
 
   if (fs.existsSync(LOGO_PATH)) {
     try {
@@ -306,58 +453,48 @@ module.exports = (res, p) => {
         (pageW - 200) / 2,
         y,
         {
-          fit: [200, 60],
+          fit: [200, 58],
           align: 'center',
-          valign: 'center'
+          valign: 'center',
         }
       );
 
-      y += 68;
-    } catch (e) {
+      y += 65;
+    } catch (error) {
       console.error(
         'Logo could not be loaded:',
-        e.message
+        error.message
       );
     }
   }
 
-  /* =======================================================
-     Company address
-     ======================================================= */
+  // =======================================================
+  // 2. COMPANY ADDRESS
+  // =======================================================
 
   if (COMPANY_ADDRESS) {
     doc
       .fillColor('#64748b')
       .font('Helvetica')
-      .fontSize(8.5)
+      .fontSize(8)
       .text(
         COMPANY_ADDRESS,
         left,
         y,
         {
           width: contentW,
-          align: 'center'
+          align: 'center',
         }
       );
 
-    y += 14;
+    y += 13;
   }
 
-  y += 8;
+  y += 6;
 
-  /* =======================================================
-     2. Title
-     ======================================================= */
-
-  const lastDay =
-    new Date(
-      year,
-      month,
-      0
-    ).getDate();
-
-  const mon =
-    MONTHS[month - 1] || '';
+  // =======================================================
+  // 3. TITLE
+  // =======================================================
 
   doc
     .rect(
@@ -373,25 +510,25 @@ module.exports = (res, p) => {
     .font('Helvetica-Bold')
     .fontSize(14)
     .text(
-      `Payslip for ${mon} ${year}`,
+      `Payslip for ${monthName} ${year}`,
       left,
       y + 8,
       {
         width: contentW,
-        align: 'center'
+        align: 'center',
       }
     );
 
   doc
     .font('Helvetica')
-    .fontSize(10)
+    .fontSize(9)
     .text(
-      `Pay period: 01 ${mon.slice(
+      `Pay period: 01 ${monthName.slice(
         0,
         3
       )} ${year} to ${pad(
         lastDay
-      )} ${mon.slice(
+      )} ${monthName.slice(
         0,
         3
       )} ${year}`,
@@ -399,265 +536,257 @@ module.exports = (res, p) => {
       y + 27,
       {
         width: contentW,
-        align: 'center'
+        align: 'center',
       }
     );
 
-  y += 46 + 14;
+  y += 46 + 12;
 
-  /* =======================================================
-     3. Employee details
-     
-     Department intentionally excluded from payslip PDF.
-     ======================================================= */
+  // =======================================================
+  // 4. EMPLOYEE DETAILS
+  // =======================================================
+  //
+  // Department intentionally excluded.
+  // Annual CTC intentionally excluded.
+  //
+  // All information here comes from the employee
+  // record joined by the payslip download route.
+  // =======================================================
 
-  const items = [
+  const employeeDetails = [
     [
-      'Employee name',
-      p.name
+      'Employee Name',
+      p.name,
     ],
-
     [
       'Employee ID',
-      p.emp_code ||
-        p.employee_id
+      p.emp_code || p.employee_id,
     ],
-
     [
       'Email',
-      p.email
+      p.email,
     ],
-
     [
       'Designation',
-      p.designation
+      p.designation,
     ],
-
     [
       'Gender',
-      p.gender
+      p.gender,
     ],
-
     [
-      'Date of birth',
-      fmtDate(p.dob)
+      'Date of Birth',
+      formatDate(p.dob),
     ],
-
     [
-      'Date of joining',
-      fmtDate(p.joining_date)
+      'Date of Joining',
+      formatDate(p.joining_date),
     ],
-
     [
-      'Date of resignation',
+      'Date of Resignation',
       p.resignation_date
-        ? fmtDate(
-            p.resignation_date
-          )
-        : '-'
+        ? formatDate(p.resignation_date)
+        : '-',
     ],
-
     [
       'PAN',
-      p.pan
+      p.pan,
     ],
-
     [
       'PF UAN',
-      p.pf_uan
+      p.pf_uan,
     ],
-
     [
-      'Bank account no.',
-      mask(p.account_number)
+      'Bank Account No.',
+      mask(p.account_number),
     ],
-
     [
       'IFSC Code',
-      p.ifsc_code
+      p.ifsc_code,
     ],
-
     [
-      'Tax regime',
-      p.tax_regime
+      'Tax Regime',
+      formatTaxRegime(
+        p.tax_regime
+      ),
     ],
-
     [
-      'Employment status',
-      p.is_active
-        ? 'Active'
-        : 'Inactive'
+      'Employee Status',
+      formatStatus(
+        p.is_active
+      ),
     ],
-
-    [
-      'Annual CTC',
-      `INR ${inr(p.ctc)}`
-    ]
   ];
 
-  const cw = [
-    100,
-    157.5,
-    100,
-    157.5
-  ];
+  const detailLabelW = 100;
+  const detailValueW =
+    (contentW -
+      detailLabelW * 2) /
+    2;
 
-  const rowH = 24;
+  const detailRowH = 22;
 
   for (
     let i = 0;
-    i < items.length;
+    i < employeeDetails.length;
     i += 2
   ) {
+    const first =
+      employeeDetails[i];
+
+    const second =
+      employeeDetails[i + 1] || [
+        '',
+        '',
+      ];
+
     let x = left;
 
-    [
-      items[i],
-      items[i + 1] || ['', '']
-    ].forEach(
-      ([k, v]) => {
-        cell(
-          x,
-          y,
-          cw[0],
-          rowH,
-          k,
-          {
-            fill: '#f1f5f9',
-            color: '#475569',
-            bold: true,
-            size: 8.5
-          }
-        );
-
-        x += cw[0];
-
-        cell(
-          x,
-          y,
-          cw[1],
-          rowH,
-          k === ''
-            ? ''
-            : isEmpty(v)
-              ? '-'
-              : v
-        );
-
-        x += cw[1];
+    // First label
+    cell(
+      x,
+      y,
+      detailLabelW,
+      detailRowH,
+      first[0],
+      {
+        fill: '#f1f5f9',
+        color: '#475569',
+        bold: true,
+        size: 8,
       }
     );
 
-    y += rowH;
+    x += detailLabelW;
+
+    // First value
+    cell(
+      x,
+      y,
+      detailValueW,
+      detailRowH,
+      isEmpty(first[1])
+        ? '-'
+        : first[1],
+      {
+        size: 8.5,
+      }
+    );
+
+    x += detailValueW;
+
+    // Second label
+    cell(
+      x,
+      y,
+      detailLabelW,
+      detailRowH,
+      second[0],
+      {
+        fill: '#f1f5f9',
+        color: '#475569',
+        bold: true,
+        size: 8,
+      }
+    );
+
+    x += detailLabelW;
+
+    // Second value
+    cell(
+      x,
+      y,
+      detailValueW,
+      detailRowH,
+      isEmpty(second[1])
+        ? ''
+        : second[1],
+      {
+        size: 8.5,
+      }
+    );
+
+    y += detailRowH;
   }
 
-  y += 16;
+  y += 14;
 
-  /* =======================================================
-     4. Earnings and deductions
-     ======================================================= */
-
-  /*
-   * EARNINGS
-   *
-   * Basic
-   * HRA
-   * Special Allowance
-   * LTA
-   * Other Allowances
-   * Additional Allowance
-   */
+  // =======================================================
+  // 5. EARNINGS & DEDUCTIONS
+  // =======================================================
 
   const earnings = [
     [
       'Basic',
-      p.basic
+      p.basic,
     ],
-
     [
       'HRA (House Rent Allowance)',
-      p.hra
+      p.hra,
     ],
-
     [
       'Special Allowance',
-      p.special_allowance
+      p.special_allowance,
     ],
-
     [
       'LTA (Leave Travel Allowance)',
-      p.lta
+      p.lta,
     ],
-
     [
       'Other Allowances',
-      p.other_allowances
+      p.other_allowances,
     ],
-
     [
       'Additional Allowance',
-      p.allowances
-    ]
+      p.allowances,
+    ],
   ];
 
-  /*
-   * DEDUCTIONS
-   *
-   * EPF
-   * Professional Tax
-   * Additional Deduction
-   */
-
-  const deducts = [
+  const deductions = [
     [
       "EPF (Employees' Provident Fund)",
-      p.epf
+      p.epf,
     ],
-
     [
       'Professional Tax',
-      p.professional_tax
+      p.professional_tax,
     ],
-
     [
       'Additional Deduction',
-      p.deductions
-    ]
+      p.deductions,
+    ],
   ];
 
-  const totalEarn =
+  const totalEarnings =
     earnings.reduce(
-      (s, [, v]) =>
-        s + num(v),
+      (sum, [, value]) =>
+        sum + num(value),
       0
     );
 
-  const totalDed =
-    deducts.reduce(
-      (s, [, v]) =>
-        s + num(v),
+  const totalDeductions =
+    deductions.reduce(
+      (sum, [, value]) =>
+        sum + num(value),
       0
     );
 
-  /*
-   * Use the actual saved net_pay
-   * from PostgreSQL.
-   */
+  // IMPORTANT:
+  // net_pay is the actual value stored in PostgreSQL.
+  const netPay = num(p.net_pay);
 
-  const net =
-    num(p.net_pay);
-
-  const tw = [
+  const tableWidths = [
     170,
     87.5,
     170,
-    87.5
+    87.5,
   ];
 
-  const head = {
+  const tableHeader = {
     fill: '#eef2ff',
     color: '#312e81',
-    bold: true
+    bold: true,
+    size: 8.5,
   };
 
   let x = left;
@@ -666,162 +795,175 @@ module.exports = (res, p) => {
     'Earnings',
     'Amount (INR)',
     'Deductions',
-    'Amount (INR)'
-  ].forEach(
-    (h, i) => {
-      cell(
-        x,
-        y,
-        tw[i],
-        26,
-        h,
-        {
-          ...head,
-          align:
-            i % 2
-              ? 'right'
-              : 'left'
-        }
-      );
+    'Amount (INR)',
+  ].forEach((header, index) => {
+    cell(
+      x,
+      y,
+      tableWidths[index],
+      25,
+      header,
+      {
+        ...tableHeader,
+        align:
+          index % 2
+            ? 'right'
+            : 'left',
+      }
+    );
 
-      x += tw[i];
-    }
+    x += tableWidths[index];
+  });
+
+  y += 25;
+
+  const rows = Math.max(
+    earnings.length,
+    deductions.length
   );
 
-  y += 26;
-
-  const n =
-    Math.max(
-      earnings.length,
-      deducts.length
-    );
+  const salaryRowH = 22;
 
   for (
     let i = 0;
-    i < n;
+    i < rows;
     i++
   ) {
-    const e =
+    const earning =
       earnings[i];
 
-    const d =
-      deducts[i];
+    const deduction =
+      deductions[i];
 
+    // Earnings label
     cell(
       left,
       y,
-      tw[0],
-      rowH,
-      e
-        ? e[0]
-        : ''
-    );
-
-    cell(
-      left + tw[0],
-      y,
-      tw[1],
-      rowH,
-      e
-        ? inr(e[1])
+      tableWidths[0],
+      salaryRowH,
+      earning
+        ? earning[0]
         : '',
       {
-        align: 'right'
+        size: 8.5,
       }
     );
 
+    // Earnings amount
     cell(
-      left +
-        tw[0] +
-        tw[1],
+      left + tableWidths[0],
       y,
-      tw[2],
-      rowH,
-      d
-        ? d[0]
-        : ''
-    );
-
-    cell(
-      left +
-        tw[0] +
-        tw[1] +
-        tw[2],
-      y,
-      tw[3],
-      rowH,
-      d
-        ? inr(d[1])
+      tableWidths[1],
+      salaryRowH,
+      earning
+        ? inr(earning[1])
         : '',
       {
-        align: 'right'
+        size: 8.5,
+        align: 'right',
       }
     );
 
-    y += rowH;
+    // Deduction label
+    cell(
+      left +
+        tableWidths[0] +
+        tableWidths[1],
+      y,
+      tableWidths[2],
+      salaryRowH,
+      deduction
+        ? deduction[0]
+        : '',
+      {
+        size: 8.5,
+      }
+    );
+
+    // Deduction amount
+    cell(
+      left +
+        tableWidths[0] +
+        tableWidths[1] +
+        tableWidths[2],
+      y,
+      tableWidths[3],
+      salaryRowH,
+      deduction
+        ? inr(deduction[1])
+        : '',
+      {
+        size: 8.5,
+        align: 'right',
+      }
+    );
+
+    y += salaryRowH;
   }
 
-  /* =======================================================
-     Totals
-     ======================================================= */
+  // =======================================================
+  // TOTALS
+  // =======================================================
 
-  const tot = {
+  const totalOptions = {
     fill: '#f1f5f9',
-    bold: true
+    color: '#0f172a',
+    bold: true,
+    size: 8.5,
   };
 
   cell(
     left,
     y,
-    tw[0],
-    26,
-    'Total earnings',
-    tot
+    tableWidths[0],
+    25,
+    'Total Earnings',
+    totalOptions
   );
 
   cell(
-    left + tw[0],
+    left + tableWidths[0],
     y,
-    tw[1],
-    26,
-    inr(totalEarn),
+    tableWidths[1],
+    25,
+    inr(totalEarnings),
     {
-      ...tot,
-      align: 'right'
+      ...totalOptions,
+      align: 'right',
     }
   );
 
   cell(
     left +
-      tw[0] +
-      tw[1],
+      tableWidths[0] +
+      tableWidths[1],
     y,
-    tw[2],
-    26,
-    'Total deductions',
-    tot
+    tableWidths[2],
+    25,
+    'Total Deductions',
+    totalOptions
   );
 
   cell(
     left +
-      tw[0] +
-      tw[1] +
-      tw[2],
+      tableWidths[0] +
+      tableWidths[1] +
+      tableWidths[2],
     y,
-    tw[3],
-    26,
-    inr(totalDed),
+    tableWidths[3],
+    25,
+    inr(totalDeductions),
     {
-      ...tot,
-      align: 'right'
+      ...totalOptions,
+      align: 'right',
     }
   );
 
-  y += 26 + 16;
+  y += 25 + 14;
 
-  /* =======================================================
-     5. Net pay
-     ======================================================= */
+  // =======================================================
+  // 6. NET PAY
+  // =======================================================
 
   doc
     .roundedRect(
@@ -836,7 +978,7 @@ module.exports = (res, p) => {
   doc
     .fillColor('#ffffff')
     .font('Helvetica-Bold')
-    .fontSize(12)
+    .fontSize(11)
     .text(
       'NET PAY',
       left + 16,
@@ -844,23 +986,23 @@ module.exports = (res, p) => {
     );
 
   doc
-    .fontSize(18)
+    .font('Helvetica-Bold')
+    .fontSize(17)
     .text(
-      `INR ${inr(net)}`,
+      `INR ${inr(netPay)}`,
       left + 16,
-      y + 14,
+      y + 13,
       {
-        width:
-          contentW - 32,
-        align: 'right'
+        width: contentW - 32,
+        align: 'right',
       }
     );
 
   y += 46 + 8;
 
-  /* =======================================================
-     Net pay in words
-     ======================================================= */
+  // =======================================================
+  // 7. NET PAY IN WORDS
+  // =======================================================
 
   doc
     .rect(
@@ -876,9 +1018,9 @@ module.exports = (res, p) => {
   doc
     .fillColor('#475569')
     .font('Helvetica-Bold')
-    .fontSize(8.5)
+    .fontSize(8)
     .text(
-      'Net pay in words',
+      'Net Pay in Words',
       left + 10,
       y + 7
     );
@@ -886,22 +1028,21 @@ module.exports = (res, p) => {
   doc
     .fillColor('#0f172a')
     .font('Helvetica')
-    .fontSize(10)
+    .fontSize(9)
     .text(
-      netWords(net),
+      netWords(netPay),
       left + 10,
       y + 20,
       {
-        width:
-          contentW - 20
+        width: contentW - 20,
       }
     );
 
-  y += 40 + 20;
+  y += 40 + 16;
 
-  /* =======================================================
-     6. Footer
-     ======================================================= */
+  // =======================================================
+  // 8. FOOTER
+  // =======================================================
 
   const currentYear =
     new Date().getFullYear();
@@ -909,16 +1050,20 @@ module.exports = (res, p) => {
   doc
     .fillColor('#94a3b8')
     .font('Helvetica')
-    .fontSize(8)
+    .fontSize(7.5)
     .text(
       `© ${currentYear} 5 Gen Educon Private Limited. All rights reserved.`,
       left,
       y,
       {
         width: contentW,
-        align: 'center'
+        align: 'center',
       }
     );
+
+  // =======================================================
+  // FINISH PDF
+  // =======================================================
 
   doc.end();
 };

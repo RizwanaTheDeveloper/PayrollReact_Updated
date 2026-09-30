@@ -66,7 +66,7 @@ const emptyForm = {
   joining_date: todayStr(),
   resignation_date: '',
   ctc: '',
-  tax_regime: 'old',
+  tax_regime: 'new',
 
   // Earnings
   basic: '',
@@ -1738,13 +1738,14 @@ export default function Employees() {
                     onChange={handleChange}
                     className="employee-select"
                   >
+                    <option value="new">
+                      New Regime
+                    </option>
+
                     <option value="old">
                       Old Regime
                     </option>
 
-                    <option value="new">
-                      New Regime
-                    </option>
                   </select>
                 </div>
 
@@ -2060,7 +2061,7 @@ export default function Employees() {
                           employee.designation || ''
                         }
                       >
-                        {employee.designation || '-'}
+                        {employee.designation || '-'} 
                       </span>
                     </td>
 

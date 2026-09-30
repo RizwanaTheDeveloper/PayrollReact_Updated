@@ -1,26 +1,27 @@
 const router = require('express').Router();
 
 const pool = require('../config/db');
+
 const asyncHandler = require('../utils/asyncHandler');
+
 const {
   authenticate,
-  authorize
+  authorize,
 } = require('../middleware/auth');
 
 const generatePayslipPdf =
   require('../utils/payslipPdf');
 
-
 router.use(authenticate);
-
 
 // =========================================================
 // HELPERS
 // =========================================================
 
-const num = (value) =>
-  Number(value) || 0;
-
+const num = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
 
 // =========================================================
 // EMPLOYEE - MY PAYSLIPS
@@ -28,58 +29,44 @@ const num = (value) =>
 
 router.get(
   '/my',
-  asyncHandler(
-    async (req, res) => {
+  asyncHandler(async (req, res) => {
+    const { rows } = await pool.query(
+      `
+      SELECT
+        id,
+        month,
+        year,
 
-      const {
-        rows
-      } = await pool.query(
+        -- Earnings
+        basic,
+        hra,
+        special_allowance,
+        lta,
+        other_allowances,
+        allowances,
 
-        `
-        SELECT
+        -- Deductions
+        epf,
+        professional_tax,
+        deductions,
 
-          id,
+        -- Final
+        net_pay
 
-          month,
+      FROM payslips
 
-          year,
+      WHERE employee_id = $1
 
-          -- Earnings
-          basic,
-          hra,
-          special_allowance,
-          lta,
-          other_allowances,
+      ORDER BY
+        year DESC,
+        month DESC
+      `,
+      [req.user.id]
+    );
 
-          -- Extra allowance
-          allowances,
-
-          -- Deductions
-          epf,
-          professional_tax,
-          deductions,
-
-          -- Final
-          net_pay
-
-        FROM payslips
-
-        WHERE employee_id = $1
-
-        ORDER BY
-          year DESC,
-          month DESC
-        `,
-
-        [req.user.id]
-      );
-
-
-      res.json(rows);
-    }
-  )
+    res.json(rows);
+  })
 );
-
 
 // =========================================================
 // ADMIN - VIEW PAYSLIPS
@@ -88,62 +75,46 @@ router.get(
 router.get(
   '/',
   authorize('admin'),
+  asyncHandler(async (req, res) => {
+    const {
+      month,
+      year,
+      employee_id,
+    } = req.query;
 
-  asyncHandler(
-    async (req, res) => {
+    const where = [];
+    const vals = [];
 
-      const {
-        month,
-        year,
-        employee_id
-      } = req.query;
+    if (month) {
+      vals.push(month);
 
+      where.push(
+        `p.month = $${vals.length}`
+      );
+    }
 
-      const where = [];
-      const vals = [];
+    if (year) {
+      vals.push(year);
 
+      where.push(
+        `p.year = $${vals.length}`
+      );
+    }
 
-      if (month) {
+    if (employee_id) {
+      vals.push(employee_id);
 
-        vals.push(month);
+      where.push(
+        `p.employee_id = $${vals.length}`
+      );
+    }
 
-        where.push(
-          `p.month = $${vals.length}`
-        );
-      }
-
-
-      if (year) {
-
-        vals.push(year);
-
-        where.push(
-          `p.year = $${vals.length}`
-        );
-      }
-
-
-      if (employee_id) {
-
-        vals.push(employee_id);
-
-        where.push(
-          `p.employee_id = $${vals.length}`
-        );
-      }
-
-
-      const {
-        rows
-      } = await pool.query(
-
+    const { rows } =
+      await pool.query(
         `
         SELECT
-
           p.*,
-
           e.name,
-
           e.emp_code
 
         FROM payslips p
@@ -153,8 +124,7 @@ router.get(
 
         ${
           where.length
-            ? 'WHERE ' +
-              where.join(' AND ')
+            ? 'WHERE ' + where.join(' AND ')
             : ''
         }
 
@@ -163,19 +133,15 @@ router.get(
           p.month DESC,
           e.name
         `,
-
         vals
       );
 
-
-      res.json(rows);
-    }
-  )
+    res.json(rows);
+  })
 );
 
-
 // =========================================================
-// GENERATE PAYSLIPS
+// GENERATE / UPDATE PAYSLIPS
 // =========================================================
 //
 // Body:
@@ -183,183 +149,208 @@ router.get(
 // {
 //   month,
 //   year,
-//   allowances?,
-//   deductions?,
-//   employee_id?
+//   employee_id,
+//   allowances,
+//   deductions,
+//   epf,
+//   professional_tax
 // }
 //
-// allowances = additional allowance
-// deductions = additional deduction
+// allowances          = additional allowance
+// deductions          = additional deduction
+// epf                 = payslip-specific EPF
+// professional_tax    = payslip-specific Professional Tax
 //
-// Employee EPF + Professional Tax are automatically
-// taken from the employee salary structure.
+// If epf/professional_tax are not supplied,
+// employee master values are used.
+//
+// If payslip already exists for the same
+// employee/month/year, it is UPDATED.
 // =========================================================
 
 router.post(
   '/generate',
   authorize('admin'),
+  asyncHandler(async (req, res) => {
+    const month = Number(
+      req.body?.month
+    );
 
-  asyncHandler(
-    async (req, res) => {
+    const year = Number(
+      req.body?.year
+    );
 
-      const month =
-        Number(req.body?.month);
+    const extra = num(
+      req.body?.allowances
+    );
 
-      const year =
-        Number(req.body?.year);
+    const additionalDeduction = num(
+      req.body?.deductions
+    );
 
+    const mode = String(
+      req.body?.mode || 'generate'
+    ).toLowerCase();
 
-      const extra =
-        num(req.body?.allowances);
+    const isUpdateMode =
+      mode === 'update';
 
+    const only =
+      req.body?.employee_id !== undefined &&
+      req.body?.employee_id !== null &&
+      req.body?.employee_id !== ''
+        ? Number(req.body.employee_id)
+        : null;
 
-      const additionalDeduction =
-        num(req.body?.deductions);
+    // -----------------------------------------------------
+    // IMPORTANT:
+    // null means "use employee master value"
+    // otherwise use the value supplied by Payroll page.
+    // -----------------------------------------------------
 
+    const epfOverride =
+      req.body?.epf !== undefined &&
+      req.body?.epf !== null &&
+      req.body?.epf !== ''
+        ? num(req.body.epf)
+        : null;
 
-      const only =
-        req.body?.employee_id
-          ? Number(
-              req.body.employee_id
-            )
-          : null;
+    const professionalTaxOverride =
+      req.body?.professional_tax !== undefined &&
+      req.body?.professional_tax !== null &&
+      req.body?.professional_tax !== ''
+        ? num(req.body.professional_tax)
+        : null;
 
+    // -----------------------------------------------------
+    // VALIDATION
+    // -----------------------------------------------------
 
-      // ---------------------------------------------------
-      // VALIDATION
-      // ---------------------------------------------------
+    if (
+      !(month >= 1 && month <= 12) ||
+      !(year >= 2000 && year <= 2100)
+    ) {
+      return res.status(400).json({
+        message:
+          'Valid month (1-12) and year are required',
+      });
+    }
 
-      if (
-        !(month >= 1 && month <= 12) ||
-        !(year >= 2000 && year <= 2100)
-      ) {
+    if (
+      only !== null &&
+      (!Number.isInteger(only) || only <= 0)
+    ) {
+      return res.status(400).json({
+        message:
+          'A valid employee is required',
+      });
+    }
 
-        return res
-          .status(400)
-          .json({
-            message:
-              'Valid month (1-12) and year are required'
-          });
-      }
+    if (
+      !['generate', 'update'].includes(
+        mode
+      )
+    ) {
+      return res.status(400).json({
+        message:
+          'Invalid action mode',
+      });
+    }
 
+    if (
+      extra < 0 ||
+      additionalDeduction < 0 ||
+      (epfOverride !== null &&
+        epfOverride < 0) ||
+      (professionalTaxOverride !== null &&
+        professionalTaxOverride < 0)
+    ) {
+      return res.status(400).json({
+        message:
+          'Amounts cannot be negative',
+      });
+    }
 
-      if (
-        extra < 0 ||
-        additionalDeduction < 0
-      ) {
+    // -----------------------------------------------------
+    // ELIGIBILITY
+    // -----------------------------------------------------
 
-        return res
-          .status(400)
-          .json({
-            message:
-              'Amounts cannot be negative'
-          });
-      }
+    const ELIGIBLE = `
+      e.role = 'employee'
 
+      AND e.is_active
 
-      // ---------------------------------------------------
-      // ELIGIBILITY
-      // ---------------------------------------------------
+      AND (
+        $1::int IS NULL
+        OR e.id = $1::int
+      )
 
-      const ELIGIBLE = `
+      AND (
+        e.joining_date IS NULL
+        OR e.joining_date <
+          make_date(
+            $3::int,
+            $2::int,
+            1
+          ) + interval '1 month'
+      )
 
-        e.role = 'employee'
+      AND (
+        e.resignation_date IS NULL
+        OR e.resignation_date >=
+          make_date(
+            $3::int,
+            $2::int,
+            1
+          )
+      )
+    `;
 
-        AND e.is_active
-
-        AND (
-          $1::int IS NULL
-          OR e.id = $1::int
+    const existingCheck = isUpdateMode
+      ? ''
+      : `
+        AND NOT EXISTS (
+          SELECT 1
+          FROM payslips p2
+          WHERE p2.employee_id = e.id
+            AND p2.year = $3::int
+            AND p2.month = $2::int
         )
-
-        AND (
-
-          e.joining_date IS NULL
-
-          OR e.joining_date <
-            make_date(
-              $3::int,
-              $2::int,
-              1
-            )
-            + interval '1 month'
-        )
-
-        AND (
-
-          e.resignation_date IS NULL
-
-          OR e.resignation_date >=
-            make_date(
-              $3::int,
-              $2::int,
-              1
-            )
-        )
-
       `;
 
+    // -----------------------------------------------------
+    // CHECK EMPLOYEES WITHOUT BASIC SALARY
+    // -----------------------------------------------------
 
-      // ---------------------------------------------------
-      // EMPLOYEES WITHOUT BASIC SALARY
-      // ---------------------------------------------------
+    const noSalary =
+      await pool.query(
+        `
+        SELECT
+          COUNT(*)::int AS n
 
-      const noSalary =
-        await pool.query(
+        FROM employees e
 
-          `
-          SELECT
-            COUNT(*)::int AS n
+        WHERE ${ELIGIBLE}
 
-          FROM employees e
+          AND COALESCE(e.basic, 0) <= 0
+        `,
+        [
+          only,
+          month,
+          year,
+        ]
+      );
 
-          WHERE ${ELIGIBLE}
+    // -----------------------------------------------------
+    // GENERATE / UPDATE PAYSLIP
+    // -----------------------------------------------------
 
-            AND e.basic <= 0
-          `,
-
-          [
-            only,
-            month,
-            year
-          ]
-        );
-
-
-      // ===================================================
-      // CALCULATION
-      // ===================================================
-      //
-      // Earnings:
-      //
-      // Basic
-      // HRA
-      // Special Allowance
-      // LTA
-      // Other Allowances
-      // Extra Allowance
-      //
-      // Deductions:
-      //
-      // EPF
-      // Professional Tax
-      // Additional Deduction
-      //
-      // Net Pay =
-      // Gross Earnings - Total Deductions
-      // ===================================================
-
-      const {
-        rowCount
-      } = await pool.query(
-
+    const { rowCount } =
+      await pool.query(
         `
         INSERT INTO payslips (
-
           employee_id,
-
           month,
-
           year,
 
           -- Earnings
@@ -368,8 +359,6 @@ router.post(
           special_allowance,
           lta,
           other_allowances,
-
-          -- Additional allowance
           allowances,
 
           -- Deductions
@@ -377,111 +366,111 @@ router.post(
           professional_tax,
           deductions,
 
-          -- Net
+          -- Final
           net_pay
         )
-
 
         SELECT
 
           e.id,
 
           $2::int,
-
           $3::int,
 
-
-          -- ==========================================
+          -- ---------------------------------------------
           -- EARNINGS
-          -- ==========================================
+          -- ---------------------------------------------
 
-          e.basic,
+          COALESCE(e.basic, 0),
 
-          e.hra,
+          COALESCE(e.hra, 0),
 
-          e.special_allowance,
+          COALESCE(
+            e.special_allowance,
+            0
+          ),
 
-          e.lta,
+          COALESCE(e.lta, 0),
 
-          e.other_allowances,
-
+          COALESCE(
+            e.other_allowances,
+            0
+          ),
 
           -- Additional allowance
           $4::numeric,
 
+          -- ---------------------------------------------
+          -- DEDUCTIONS
+          -- ---------------------------------------------
 
-          -- ==========================================
           -- EPF
-          -- ==========================================
+          CASE
+            WHEN $6::numeric IS NULL
+              THEN COALESCE(e.epf, 0)
+            ELSE $6::numeric
+          END,
 
-          COALESCE(
-            e.epf,
-            0
-          ),
+          -- Professional Tax
+          CASE
+            WHEN $7::numeric IS NULL
+              THEN COALESCE(
+                e.professional_tax,
+                0
+              )
+            ELSE $7::numeric
+          END,
 
-
-          -- ==========================================
-          -- PROFESSIONAL TAX
-          -- ==========================================
-
-          COALESCE(
-            e.professional_tax,
-            0
-          ),
-
-
-          -- ==========================================
-          -- TOTAL ADDITIONAL DEDUCTIONS
-          -- ==========================================
-
+          -- Additional deduction
           $5::numeric,
 
-
-          -- ==========================================
+          -- ---------------------------------------------
           -- NET PAY
-          -- ==========================================
-          --
-          -- Basic
-          -- + HRA
-          -- + Special
-          -- + LTA
-          -- + Other Allowances
-          -- + Extra Allowance
-          --
-          -- - EPF
-          -- - Professional Tax
-          -- - Additional Deduction
-          -- ==========================================
+          -- ---------------------------------------------
 
-          e.basic
+          (
+            COALESCE(e.basic, 0)
+            + COALESCE(e.hra, 0)
+            + COALESCE(
+                e.special_allowance,
+                0
+              )
+            + COALESCE(e.lta, 0)
+            + COALESCE(
+                e.other_allowances,
+                0
+              )
+            + $4::numeric
 
-          + e.hra
+            -
 
-          + e.special_allowance
+            CASE
+              WHEN $6::numeric IS NULL
+                THEN COALESCE(e.epf, 0)
+              ELSE $6::numeric
+            END
 
-          + e.lta
+            -
 
-          + e.other_allowances
+            CASE
+              WHEN $7::numeric IS NULL
+                THEN COALESCE(
+                  e.professional_tax,
+                  0
+                )
+              ELSE $7::numeric
+            END
 
-          + $4::numeric
-
-          - COALESCE(e.epf, 0)
-
-          - COALESCE(
-              e.professional_tax,
-              0
-            )
-
-          - $5::numeric
-
+            - $5::numeric
+          )
 
         FROM employees e
 
-
         WHERE ${ELIGIBLE}
 
-          AND e.basic > 0
+          ${existingCheck}
 
+          AND COALESCE(e.basic, 0) > 0
 
         ON CONFLICT (
           employee_id,
@@ -489,38 +478,57 @@ router.post(
           month
         )
 
-        DO NOTHING
+        ${
+          isUpdateMode
+            ? `DO UPDATE SET
+              basic = EXCLUDED.basic,
+              hra = EXCLUDED.hra,
+              special_allowance = EXCLUDED.special_allowance,
+              lta = EXCLUDED.lta,
+              other_allowances = EXCLUDED.other_allowances,
+              allowances = EXCLUDED.allowances,
+              epf = EXCLUDED.epf,
+              professional_tax = EXCLUDED.professional_tax,
+              deductions = EXCLUDED.deductions,
+              net_pay = EXCLUDED.net_pay`
+            : 'DO NOTHING'
+        }
         `,
-
         [
           only,
           month,
           year,
           extra,
-          additionalDeduction
+          additionalDeduction,
+          epfOverride,
+          professionalTaxOverride,
         ]
       );
 
+    // -----------------------------------------------------
+    // RESPONSE
+    // -----------------------------------------------------
 
-      // ---------------------------------------------------
-      // RESPONSE
-      // ---------------------------------------------------
+    const message = isUpdateMode
+      ? 'Payslip updated successfully.'
+      : rowCount
+        ? only !== null
+          ? 'Payslip generated successfully.'
+          : 'Payslips generated successfully.'
+        : only !== null
+          ? 'Payslip already exists. Use Update Payslip to modify it.'
+          : 'No new payslips were generated. Existing payslips were left unchanged.';
 
-      res
-        .status(201)
-        .json({
+    res.status(201).json({
+      generated: rowCount,
 
-          generated:
-            rowCount,
+      skippedNoSalary:
+        noSalary.rows[0].n,
 
-          skippedNoSalary:
-            noSalary.rows[0].n
-
-        });
-    }
-  )
+      message,
+    });
+  })
 );
-
 
 // =========================================================
 // DELETE PAYSLIP
@@ -529,144 +537,149 @@ router.post(
 router.delete(
   '/:id',
   authorize('admin'),
-
-  asyncHandler(
-    async (req, res) => {
-
-      const {
-        rowCount
-      } = await pool.query(
-
+  asyncHandler(async (req, res) => {
+    const { rowCount } =
+      await pool.query(
         `
         DELETE FROM payslips
-
         WHERE id = $1
         `,
-
         [req.params.id]
       );
 
-
-      if (!rowCount) {
-
-        return res
-          .status(404)
-          .json({
-            message:
-              'Payslip not found'
-          });
-      }
-
-
-      res.json({
-        message: 'Deleted'
+    if (!rowCount) {
+      return res.status(404).json({
+        message:
+          'Payslip not found',
       });
     }
-  )
-);
 
+    res.json({
+      message: 'Deleted',
+    });
+  })
+);
 
 // =========================================================
 // DOWNLOAD PAYSLIP PDF
 // =========================================================
+//
+// Admin:
+//   Can download any payslip.
+//
+// Employee:
+//   Can download only their own payslip.
+// =========================================================
 
 router.get(
   '/:id/download',
+  asyncHandler(async (req, res) => {
+    const isAdmin =
+      req.user?.role === 'admin';
 
-  asyncHandler(
-    async (req, res) => {
+    const queryValues = isAdmin
+      ? [req.params.id]
+      : [
+          req.params.id,
+          req.user.id,
+        ];
 
-      const {
-        rows
-      } = await pool.query(
+    const whereClause = isAdmin
+      ? 'p.id = $1'
+      : `
+        p.id = $1
+        AND p.employee_id = $2
+      `;
 
+    const { rows } =
+      await pool.query(
         `
         SELECT
-
           p.*,
 
+          -- Employee information
           e.name,
-
           e.email,
-
           e.designation,
-
           e.emp_code,
-
+          e.gender,
+          e.dob,
           e.pan,
-
           e.pf_uan,
-
           e.account_number,
-
-          e.joining_date::text
-            AS joining_date
+          e.ifsc_code,
+          e.tax_regime,
+          e.joining_date,
+          e.resignation_date,
+          e.is_active
 
         FROM payslips p
 
         JOIN employees e
           ON e.id = p.employee_id
 
-        WHERE p.id = $1
+        WHERE ${whereClause}
         `,
-
-        [req.params.id]
+        queryValues
       );
 
-
-      if (!rows.length) {
-
-        return res
-          .status(404)
-          .json({
-            message:
-              'Payslip not found'
-          });
-      }
-
-
-      const payslip =
-        rows[0];
-
-
-      // ---------------------------------------------------
-      // COMPATIBILITY FIELDS FOR PDF GENERATOR
-      // ---------------------------------------------------
-
-      payslip.account_number =
-        payslip.account_number || '';
-
-
-      payslip.bank_name = '';
-
-      payslip.gender = '';
-
-      payslip.location = '';
-
-      payslip.dob = '';
-
-      payslip.uan =
-        payslip.pf_uan || '';
-
-      payslip.resignation_date =
-        '';
-
-      payslip.month_days = 0;
-
-      payslip.net_paid_days = 0;
-
-
-      // ---------------------------------------------------
-      // Generate PDF
-      // ---------------------------------------------------
-
-      return generatePayslipPdf(
-        res,
-        payslip
-      );
+    if (!rows.length) {
+      return res.status(404).json({
+        message:
+          'Payslip not found',
+      });
     }
-  )
-);
 
+    const payslip = rows[0];
+
+    // ---------------------------------------------------
+    // NORMALIZE DATE VALUES
+    // ---------------------------------------------------
+
+    payslip.dob =
+      payslip.dob
+        ? String(payslip.dob).slice(0, 10)
+        : '';
+
+    payslip.joining_date =
+      payslip.joining_date
+        ? String(
+            payslip.joining_date
+          ).slice(0, 10)
+        : '';
+
+    payslip.resignation_date =
+      payslip.resignation_date
+        ? String(
+            payslip.resignation_date
+          ).slice(0, 10)
+        : '';
+
+    // ---------------------------------------------------
+    // COMPATIBILITY FIELDS FOR PDF GENERATOR
+    // ---------------------------------------------------
+
+    payslip.account_number =
+      payslip.account_number || '';
+
+    payslip.bank_name = '';
+
+    payslip.uan =
+      payslip.pf_uan || '';
+
+    payslip.month_days = 0;
+
+    payslip.net_paid_days = 0;
+
+    // ---------------------------------------------------
+    // GENERATE PDF
+    // ---------------------------------------------------
+
+    return generatePayslipPdf(
+      res,
+      payslip
+    );
+  })
+);
 
 module.exports = router;
