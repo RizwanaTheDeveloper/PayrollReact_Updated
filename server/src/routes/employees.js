@@ -1,18 +1,12 @@
-// server/src/routes/employees.js
-
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
+
 const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const {
   authenticate,
   authorize
 } = require('../middleware/auth');
-
-
-// =========================================================
-// Authentication
-// =========================================================
 
 router.use(
   authenticate,
@@ -21,13 +15,12 @@ router.use(
 
 
 // =========================================================
-// Allowed fields
+// FIELD DEFINITIONS
 // =========================================================
 
 const TEXT = [
   'emp_code',
   'name',
-  'email',
   'designation',
   'department',
   'gender',
@@ -45,25 +38,27 @@ const DATES = [
 
 const NUMS = [
   'ctc',
+
+  // Earnings
   'basic',
   'hra',
   'special_allowance',
   'lta',
-  'other_allowances'
+  'other_allowances',
+
+  // Deductions
+  'epf',
+  'professional_tax'
 ];
 
 
 // =========================================================
-// Date validation
+// HELPERS
 // =========================================================
 
-const isDate = (v) =>
-  /^\d{4}-\d{2}-\d{2}$/.test(v || '');
+const isDate = (value) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(value || '');
 
-
-// =========================================================
-// Fields returned to frontend
-// =========================================================
 
 const OUT = `
   id,
@@ -74,191 +69,179 @@ const OUT = `
   designation,
   department,
   gender,
+
   dob::text AS dob,
+
   ctc,
+
   pan,
   pf_uan,
+
   account_number,
   ifsc_code,
+
   tax_regime,
+
   joining_date::text AS joining_date,
   resignation_date::text AS resignation_date,
+
   basic,
   hra,
   special_allowance,
   lta,
   other_allowances,
+
+  epf,
+  professional_tax,
+
   is_active
 `;
 
 
 // =========================================================
-// Clean and validate employee data
+// CLEAN / VALIDATE INPUT
 // =========================================================
 
 function clean(body) {
-  const v = {};
+
+  const values = {};
+
 
   // -------------------------------------------------------
-  // Text fields
+  // TEXT
   // -------------------------------------------------------
 
-  for (const k of TEXT) {
-    if (!(k in body)) {
+  for (const key of TEXT) {
+
+    if (!(key in body)) {
       continue;
     }
 
-    let s =
-      body[k] == null
+    let value =
+      body[key] == null
         ? ''
-        : String(body[k]).trim();
+        : String(body[key]).trim();
 
-    // Uppercase fields
+
     if (
       [
         'emp_code',
         'pan',
         'ifsc_code'
-      ].includes(k)
+      ].includes(key)
     ) {
-      s = s.toUpperCase();
+      value = value.toUpperCase();
     }
 
-    // Email always lowercase
-    if (k === 'email') {
-      s = s.toLowerCase();
-    }
 
-    v[k] = s || null;
+    values[key] = value || null;
   }
 
 
   // -------------------------------------------------------
-  // Date fields
+  // DATES
   // -------------------------------------------------------
 
-  for (const k of DATES) {
-    if (!(k in body)) {
+  for (const key of DATES) {
+
+    if (!(key in body)) {
       continue;
     }
 
-    const s =
-      body[k] || null;
+    const value = body[key] || null;
+
 
     if (
-      s &&
+      value &&
       !isDate(
-        String(s).slice(0, 10)
+        String(value).slice(0, 10)
       )
     ) {
       return {
-        error: `Invalid ${k}`
+        error: `Invalid ${key}`
       };
     }
 
-    v[k] = s
-      ? String(s).slice(0, 10)
+
+    values[key] = value
+      ? String(value).slice(0, 10)
       : null;
   }
 
 
   // -------------------------------------------------------
-  // Numeric fields
+  // NUMERIC FIELDS
   // -------------------------------------------------------
 
-  for (const k of NUMS) {
-    if (!(k in body)) {
+  for (const key of NUMS) {
+
+    if (!(key in body)) {
       continue;
     }
 
-    const raw = body[k];
 
-    const n =
-      raw === '' ||
-      raw === null ||
-      raw === undefined
-        ? 0
-        : Number(raw);
+    const number = Number(body[key]) || 0;
 
-    if (!Number.isFinite(n)) {
-      return {
-        error: `${k} must be a valid number`
-      };
-    }
 
-    if (n < 0) {
+    if (number < 0) {
+
       return {
         error:
           'Salary components must be zero or more'
       };
     }
 
-    v[k] = n;
+
+    values[key] = number;
   }
 
 
   // -------------------------------------------------------
-  // Tax regime
+  // TAX REGIME
   // -------------------------------------------------------
 
   if ('tax_regime' in body) {
+
     if (
       !['new', 'old'].includes(
         body.tax_regime
       )
     ) {
+
       return {
         error:
           'tax_regime must be new or old'
       };
     }
 
-    v.tax_regime =
+
+    values.tax_regime =
       body.tax_regime;
   }
 
 
   // -------------------------------------------------------
-  // Required name
+  // REQUIRED / FORMAT VALIDATION
   // -------------------------------------------------------
 
   if (
-    'name' in v &&
-    !v.name
+    'name' in values &&
+    !values.name
   ) {
+
     return {
       error: 'Name is required'
     };
   }
 
 
-  // -------------------------------------------------------
-  // Email validation
-  // -------------------------------------------------------
-
-  if (v.email) {
-    const emailRegex =
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(v.email)) {
-      return {
-        error:
-          'Please enter a valid email address'
-      };
-    }
-  }
-
-
-  // -------------------------------------------------------
-  // PAN validation
-  // -------------------------------------------------------
-
   if (
-    v.pan &&
+    values.pan &&
     !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(
-      v.pan
+      values.pan
     )
   ) {
+
     return {
       error:
         'PAN must look like ABCDE1234F'
@@ -266,16 +249,13 @@ function clean(body) {
   }
 
 
-  // -------------------------------------------------------
-  // PF UAN validation
-  // -------------------------------------------------------
-
   if (
-    v.pf_uan &&
+    values.pf_uan &&
     !/^\d{12}$/.test(
-      v.pf_uan
+      values.pf_uan
     )
   ) {
+
     return {
       error:
         'PF UAN must be 12 digits'
@@ -283,16 +263,13 @@ function clean(body) {
   }
 
 
-  // -------------------------------------------------------
-  // Bank account validation
-  // -------------------------------------------------------
-
   if (
-    v.account_number &&
+    values.account_number &&
     !/^\d{9,18}$/.test(
-      v.account_number
+      values.account_number
     )
   ) {
+
     return {
       error:
         'Account number must be 9 to 18 digits'
@@ -300,16 +277,13 @@ function clean(body) {
   }
 
 
-  // -------------------------------------------------------
-  // IFSC validation
-  // -------------------------------------------------------
-
   if (
-    v.ifsc_code &&
+    values.ifsc_code &&
     !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(
-      v.ifsc_code
+      values.ifsc_code
     )
   ) {
+
     return {
       error:
         'IFSC must look like SBIN0001234'
@@ -317,16 +291,13 @@ function clean(body) {
   }
 
 
-  // -------------------------------------------------------
-  // Joining / resignation validation
-  // -------------------------------------------------------
-
   if (
-    v.joining_date &&
-    v.resignation_date &&
-    v.resignation_date <
-      v.joining_date
+    values.joining_date &&
+    values.resignation_date &&
+    values.resignation_date <
+      values.joining_date
   ) {
+
     return {
       error:
         'Resignation date cannot be before joining date'
@@ -335,44 +306,44 @@ function clean(body) {
 
 
   return {
-    values: v
+    values
   };
 }
 
 
 // =========================================================
-// Duplicate error message
+// DUPLICATE ERROR
 // =========================================================
 
-const dupMessage = (e) => {
+const dupMessage = (error) => {
+
   if (
-    e.constraint &&
-    e.constraint.includes('emp_code')
+    error.constraint &&
+    error.constraint.includes(
+      'emp_code'
+    )
   ) {
+
     return 'Employee ID already exists';
   }
 
-  if (
-    e.constraint &&
-    e.constraint.includes('email')
-  ) {
-    return 'Email already exists';
-  }
 
-  return 'Employee already exists';
+  return 'Email already exists';
 };
 
 
 // =========================================================
-// GET /api/employees/stats
-// Admin dashboard statistics
+// GET EMPLOYEE STATS
 // =========================================================
 
 router.get(
   '/stats',
-  asyncHandler(async (req, res) => {
-    const { rows } =
-      await pool.query(`
+  asyncHandler(
+    async (req, res) => {
+
+      const {
+        rows
+      } = await pool.query(`
         WITH today AS (
           SELECT
             (
@@ -386,8 +357,7 @@ router.get(
           (
             SELECT COUNT(*)
             FROM employees
-            WHERE
-              role = 'employee'
+            WHERE role = 'employee'
               AND is_active
           )::int AS "headcount",
 
@@ -401,8 +371,8 @@ router.get(
             SELECT COUNT(*)
             FROM attendance a,
                  today t
-            WHERE
-              a.work_date = t.d
+
+            WHERE a.work_date = t.d
               AND a.status = 'present'
           )::int AS "presentToday",
 
@@ -411,384 +381,429 @@ router.get(
               SUM(net_pay),
               0
             )
+
             FROM payslips p,
                  today t
-            WHERE
-              p.month =
-                EXTRACT(
-                  MONTH FROM t.d
-                )
+
+            WHERE p.month =
+              EXTRACT(
+                MONTH FROM t.d
+              )
+
               AND p.year =
-                EXTRACT(
-                  YEAR FROM t.d
-                )
+              EXTRACT(
+                YEAR FROM t.d
+              )
           ) AS "monthlyPayroll"
       `);
 
-    res.json(rows[0]);
-  })
+
+      res.json(rows[0]);
+    }
+  )
 );
 
 
 // =========================================================
-// GET /api/employees
-// Active employees
-//
-// ?all=1 -> include admins
+// GET EMPLOYEES
 // =========================================================
 
 router.get(
   '/',
-  asyncHandler(async (req, res) => {
+  asyncHandler(
+    async (req, res) => {
 
-    const roleFilter =
-      req.query.all
-        ? ''
-        : "AND role = 'employee'";
+      const roleFilter =
+        req.query.all
+          ? ''
+          : "AND role = 'employee'";
 
-    const { rows } =
-      await pool.query(
+
+      const {
+        rows
+      } = await pool.query(
         `
-          SELECT ${OUT}
-          FROM employees
-          WHERE
-            is_active
-            ${roleFilter}
-          ORDER BY name
+        SELECT ${OUT}
+
+        FROM employees
+
+        WHERE is_active
+        ${roleFilter}
+
+        ORDER BY name
         `
       );
 
-    res.json(rows);
-  })
+
+      res.json(rows);
+    }
+  )
 );
 
 
 // =========================================================
-// POST /api/employees
-// Create employee
+// CREATE EMPLOYEE
 // =========================================================
 
 router.post(
   '/',
-  asyncHandler(async (req, res) => {
+  asyncHandler(
+    async (req, res) => {
 
-    const body =
-      req.body || {};
-
-
-    // -----------------------------------------------------
-    // Validate and clean
-    // -----------------------------------------------------
-
-    const {
-      values,
-      error
-    } = clean(body);
-
-    if (error) {
-      return res
-        .status(400)
-        .json({
-          message: error
-        });
-    }
+      const body =
+        req.body || {};
 
 
-    // -----------------------------------------------------
-    // Required fields
-    // -----------------------------------------------------
-
-    if (!values.emp_code) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Employee ID is required'
-        });
-    }
-
-    if (!values.name) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Name is required'
-        });
-    }
-
-    if (!values.email) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Email is required'
-        });
-    }
-
-    if (!body.password) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Password is required'
-        });
-    }
-
-    if (!values.designation) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Designation is required'
-        });
-    }
-
-    if (!values.gender) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Gender is required'
-        });
-    }
-
-    if (!values.dob) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Date of birth is required'
-        });
-    }
+      const {
+        values,
+        error
+      } = clean(body);
 
 
-    // -----------------------------------------------------
-    // Password hashing
-    // -----------------------------------------------------
+      if (error) {
 
-    const hash =
-      await bcrypt.hash(
-        body.password,
-        10
-      );
-
-
-    // -----------------------------------------------------
-    // IMPORTANT:
-    //
-    // values already contains email.
-    //
-    // Therefore DO NOT add email separately.
-    //
-    // Previous code created:
-    //
-    // email, password_hash, role, ..., email
-    //
-    // which caused:
-    //
-    // column "email" specified more than once
-    // -----------------------------------------------------
-
-    const keys =
-      Object.keys(values);
+        return res
+          .status(400)
+          .json({
+            message: error
+          });
+      }
 
 
-    const cols = [
-      ...keys,
-      'password_hash',
-      'role'
-    ];
+      const email =
+        (body.email || '')
+          .trim();
 
 
-    const params = [
-      ...keys.map(
-        (k) => values[k]
-      ),
-      hash,
-      'employee'
-    ];
+      // ---------------------------------------------------
+      // REQUIRED FIELDS
+      // ---------------------------------------------------
+
+      if (!values.emp_code) {
+
+        return res
+          .status(400)
+          .json({
+            message:
+              'Employee ID is required'
+          });
+      }
 
 
-    const placeholders =
-      cols.map(
-        (_, i) =>
-          `$${i + 1}`
-      );
+      if (!values.name) {
+
+        return res
+          .status(400)
+          .json({
+            message:
+              'Name is required'
+          });
+      }
 
 
-    // -----------------------------------------------------
-    // Insert
-    // -----------------------------------------------------
+      if (
+        !email ||
+        !body.password
+      ) {
 
-    try {
+        return res
+          .status(400)
+          .json({
+            message:
+              'Email and password are required'
+          });
+      }
 
-      const { rows } =
-        await pool.query(
+
+      if (!values.designation) {
+
+        return res
+          .status(400)
+          .json({
+            message:
+              'Designation is required'
+          });
+      }
+
+
+      if (!values.gender) {
+
+        return res
+          .status(400)
+          .json({
+            message:
+              'Gender is required'
+          });
+      }
+
+
+      if (!values.dob) {
+
+        return res
+          .status(400)
+          .json({
+            message:
+              'Date of birth is required'
+          });
+      }
+
+
+      // ---------------------------------------------------
+      // PASSWORD HASH
+      // ---------------------------------------------------
+
+      const hash =
+        await bcrypt.hash(
+          body.password,
+          10
+        );
+
+
+      const keys =
+        Object.keys(values);
+
+
+      const cols = [
+        'email',
+        'password_hash',
+        'role',
+        ...keys
+      ];
+
+
+      const params = [
+        email,
+        hash,
+        'employee',
+        ...keys.map(
+          (key) =>
+            values[key]
+        )
+      ];
+
+
+      try {
+
+        const {
+          rows
+        } = await pool.query(
+
           `
-            INSERT INTO employees (
-              ${cols.join(', ')}
-            )
+          INSERT INTO employees (
+            ${cols.join(',')}
+          )
 
-            VALUES (
-              ${placeholders.join(', ')}
-            )
+          VALUES (
+            ${cols
+              .map(
+                (_, index) =>
+                  `$${index + 1}`
+              )
+              .join(',')}
+          )
 
-            RETURNING ${OUT}
+          RETURNING ${OUT}
           `,
+
           params
         );
 
 
-      return res
-        .status(201)
-        .json(rows[0]);
+        res
+          .status(201)
+          .json(rows[0]);
 
-    } catch (e) {
+      } catch (error) {
 
-      if (
-        e.code === '23505'
-      ) {
-        return res
-          .status(409)
-          .json({
-            message:
-              dupMessage(e)
-          });
+        if (
+          error.code === '23505'
+        ) {
+
+          return res
+            .status(409)
+            .json({
+              message:
+                dupMessage(error)
+            });
+        }
+
+
+        throw error;
       }
-
-      throw e;
     }
-  })
+  )
 );
 
 
 // =========================================================
-// PUT /api/employees/:id
-// Update employee
-//
-// Email and password are editable.
+// UPDATE EMPLOYEE
 // =========================================================
 
 router.put(
   '/:id',
-  asyncHandler(async (req, res) => {
+  asyncHandler(
+    async (req, res) => {
 
-    const body =
-      req.body || {};
-
-
-    // -----------------------------------------------------
-    // Validate
-    // -----------------------------------------------------
-
-    const {
-      values,
-      error
-    } = clean(body);
-
-    if (error) {
-      return res
-        .status(400)
-        .json({
-          message: error
-        });
-    }
+      const body =
+        req.body || {};
 
 
-    // -----------------------------------------------------
-    // Build UPDATE fields
-    // -----------------------------------------------------
-
-    const keys =
-      Object.keys(values);
-
-    const sets =
-      keys.map(
-        (k, i) =>
-          `${k} = $${i + 1}`
-      );
-
-    const params =
-      keys.map(
-        (k) => values[k]
-      );
+      const {
+        values,
+        error
+      } = clean(body);
 
 
-    // -----------------------------------------------------
-    // Password update
-    // -----------------------------------------------------
+      if (error) {
 
-    if (
-      body.password &&
-      String(
-        body.password
-      ).trim()
-    ) {
+        return res
+          .status(400)
+          .json({
+            message: error
+          });
+      }
 
-      const passwordHash =
-        await bcrypt.hash(
-          String(body.password),
-          10
+
+      const keys =
+        Object.keys(values);
+
+
+      const sets =
+        keys.map(
+          (key, index) =>
+            `${key} = $${index + 1}`
         );
 
+
+      const params =
+        keys.map(
+          (key) =>
+            values[key]
+        );
+
+
+      // ---------------------------------------------------
+      // OPTIONAL PASSWORD
+      // ---------------------------------------------------
+
+      if (body.password) {
+
+        params.push(
+          await bcrypt.hash(
+            body.password,
+            10
+          )
+        );
+
+
+        sets.push(
+          `password_hash = $${params.length}`
+        );
+      }
+
+
+      if (!sets.length) {
+
+        return res
+          .status(400)
+          .json({
+            message:
+              'Nothing to update'
+          });
+      }
+
+
       params.push(
-        passwordHash
+        req.params.id
       );
 
-      sets.push(
-        `password_hash = $${params.length}`
-      );
-    }
 
+      try {
 
-    // -----------------------------------------------------
-    // Nothing to update
-    // -----------------------------------------------------
+        const {
+          rows
+        } = await pool.query(
 
-    if (!sets.length) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Nothing to update'
-        });
-    }
-
-
-    // -----------------------------------------------------
-    // Employee ID
-    // -----------------------------------------------------
-
-    params.push(
-      req.params.id
-    );
-
-
-    // -----------------------------------------------------
-    // Update
-    // -----------------------------------------------------
-
-    try {
-
-      const { rows } =
-        await pool.query(
           `
-            UPDATE employees
+          UPDATE employees
 
-            SET
-              ${sets.join(', ')}
+          SET ${sets.join(', ')}
 
-            WHERE
-              id = $${params.length}
-              AND role = 'employee'
+          WHERE id = $${params.length}
 
-            RETURNING ${OUT}
+            AND role = 'employee'
+
+          RETURNING ${OUT}
           `,
+
           params
         );
 
 
-      if (!rows[0]) {
+        if (!rows[0]) {
+
+          return res
+            .status(404)
+            .json({
+              message:
+                'Employee not found'
+            });
+        }
+
+
+        res.json(rows[0]);
+
+      } catch (error) {
+
+        if (
+          error.code === '23505'
+        ) {
+
+          return res
+            .status(409)
+            .json({
+              message:
+                dupMessage(error)
+            });
+        }
+
+
+        throw error;
+      }
+    }
+  )
+);
+
+
+// =========================================================
+// SOFT DELETE EMPLOYEE
+// =========================================================
+
+router.delete(
+  '/:id',
+  asyncHandler(
+    async (req, res) => {
+
+      const {
+        rowCount
+      } = await pool.query(
+
+        `
+        UPDATE employees
+
+        SET is_active = false
+
+        WHERE id = $1
+
+          AND role = 'employee'
+        `,
+
+        [req.params.id]
+      );
+
+
+      if (!rowCount) {
+
         return res
           .status(404)
           .json({
@@ -798,74 +813,11 @@ router.put(
       }
 
 
-      return res.json(
-        rows[0]
-      );
-
-    } catch (e) {
-
-      if (
-        e.code === '23505'
-      ) {
-        return res
-          .status(409)
-          .json({
-            message:
-              dupMessage(e)
-          });
-      }
-
-      throw e;
+      res.json({
+        message: 'Deleted'
+      });
     }
-  })
-);
-
-
-// =========================================================
-// DELETE /api/employees/:id
-// Soft delete
-//
-// Keeps payslips, attendance,
-// and leave history.
-// =========================================================
-
-router.delete(
-  '/:id',
-  asyncHandler(async (req, res) => {
-
-    const { rowCount } =
-      await pool.query(
-        `
-          UPDATE employees
-
-          SET
-            is_active = false
-
-          WHERE
-            id = $1
-            AND role = 'employee'
-        `,
-        [
-          req.params.id
-        ]
-      );
-
-
-    if (!rowCount) {
-      return res
-        .status(404)
-        .json({
-          message:
-            'Employee not found'
-        });
-    }
-
-
-    res.json({
-      message:
-        'Employee deactivated successfully'
-    });
-  })
+  )
 );
 
 

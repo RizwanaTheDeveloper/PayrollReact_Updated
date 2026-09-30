@@ -73,7 +73,6 @@ const fmtDate = (v) => {
   } ${y}`;
 };
 
-
 /* =========================================================
    Amount in words - Indian numbering system
    ========================================================= */
@@ -139,9 +138,7 @@ const threeDigits = (n) => {
 };
 
 const inWords = (value) => {
-  let n = Math.floor(
-    num(value)
-  );
+  let n = Math.floor(num(value));
 
   if (n === 0) {
     return 'Zero';
@@ -200,7 +197,6 @@ const netWords = (amount) => {
   } Only`;
 };
 
-
 /* =========================================================
    PDF
    ========================================================= */
@@ -238,7 +234,6 @@ module.exports = (res, p) => {
 
   let y = 30;
 
-
   /* =======================================================
      Table cell helper
      ======================================================= */
@@ -251,7 +246,6 @@ module.exports = (res, p) => {
     text,
     o = {}
   ) => {
-
     if (o.fill) {
       doc
         .rect(
@@ -301,7 +295,6 @@ module.exports = (res, p) => {
       );
   };
 
-
   /* =======================================================
      1. Logo
      ======================================================= */
@@ -320,7 +313,6 @@ module.exports = (res, p) => {
       );
 
       y += 68;
-
     } catch (e) {
       console.error(
         'Logo could not be loaded:',
@@ -328,7 +320,6 @@ module.exports = (res, p) => {
       );
     }
   }
-
 
   /* =======================================================
      Company address
@@ -354,7 +345,6 @@ module.exports = (res, p) => {
 
   y += 8;
 
-
   /* =======================================================
      2. Title
      ======================================================= */
@@ -367,8 +357,7 @@ module.exports = (res, p) => {
     ).getDate();
 
   const mon =
-    MONTHS[month - 1] ||
-    '';
+    MONTHS[month - 1] || '';
 
   doc
     .rect(
@@ -416,9 +405,10 @@ module.exports = (res, p) => {
 
   y += 46 + 14;
 
-
   /* =======================================================
      3. Employee details
+     
+     Department intentionally excluded from payslip PDF.
      ======================================================= */
 
   const items = [
@@ -505,7 +495,6 @@ module.exports = (res, p) => {
     ]
   ];
 
-
   const cw = [
     100,
     157.5,
@@ -515,13 +504,11 @@ module.exports = (res, p) => {
 
   const rowH = 24;
 
-
   for (
     let i = 0;
     i < items.length;
     i += 2
   ) {
-
     let x = left;
 
     [
@@ -529,7 +516,6 @@ module.exports = (res, p) => {
       items[i + 1] || ['', '']
     ].forEach(
       ([k, v]) => {
-
         cell(
           x,
           y,
@@ -567,10 +553,20 @@ module.exports = (res, p) => {
 
   y += 16;
 
-
   /* =======================================================
      4. Earnings and deductions
      ======================================================= */
+
+  /*
+   * EARNINGS
+   *
+   * Basic
+   * HRA
+   * Special Allowance
+   * LTA
+   * Other Allowances
+   * Additional Allowance
+   */
 
   const earnings = [
     [
@@ -579,34 +575,55 @@ module.exports = (res, p) => {
     ],
 
     [
-      'HRA',
+      'HRA (House Rent Allowance)',
       p.hra
     ],
 
     [
-      'Special allowance',
+      'Special Allowance',
       p.special_allowance
     ],
 
     [
-      'LTA',
+      'LTA (Leave Travel Allowance)',
       p.lta
     ],
 
     [
-      'Other allowances',
+      'Other Allowances',
       p.other_allowances
+    ],
+
+    [
+      'Additional Allowance',
+      p.allowances
     ]
   ];
 
+  /*
+   * DEDUCTIONS
+   *
+   * EPF
+   * Professional Tax
+   * Additional Deduction
+   */
 
   const deducts = [
     [
-      'Payroll deductions',
+      "EPF (Employees' Provident Fund)",
+      p.epf
+    ],
+
+    [
+      'Professional Tax',
+      p.professional_tax
+    ],
+
+    [
+      'Additional Deduction',
       p.deductions
     ]
   ];
-
 
   const totalEarn =
     earnings.reduce(
@@ -615,7 +632,6 @@ module.exports = (res, p) => {
       0
     );
 
-
   const totalDed =
     deducts.reduce(
       (s, [, v]) =>
@@ -623,15 +639,13 @@ module.exports = (res, p) => {
       0
     );
 
-
   /*
-    Use the actual saved payslip
-    net_pay from PostgreSQL.
-  */
+   * Use the actual saved net_pay
+   * from PostgreSQL.
+   */
 
   const net =
     num(p.net_pay);
-
 
   const tw = [
     170,
@@ -640,16 +654,13 @@ module.exports = (res, p) => {
     87.5
   ];
 
-
   const head = {
     fill: '#eef2ff',
     color: '#312e81',
     bold: true
   };
 
-
   let x = left;
-
 
   [
     'Earnings',
@@ -658,7 +669,6 @@ module.exports = (res, p) => {
     'Amount (INR)'
   ].forEach(
     (h, i) => {
-
       cell(
         x,
         y,
@@ -667,7 +677,6 @@ module.exports = (res, p) => {
         h,
         {
           ...head,
-
           align:
             i % 2
               ? 'right'
@@ -679,9 +688,7 @@ module.exports = (res, p) => {
     }
   );
 
-
   y += 26;
-
 
   const n =
     Math.max(
@@ -689,19 +696,16 @@ module.exports = (res, p) => {
       deducts.length
     );
 
-
   for (
     let i = 0;
     i < n;
     i++
   ) {
-
     const e =
       earnings[i];
 
     const d =
       deducts[i];
-
 
     cell(
       left,
@@ -712,7 +716,6 @@ module.exports = (res, p) => {
         ? e[0]
         : ''
     );
-
 
     cell(
       left + tw[0],
@@ -727,7 +730,6 @@ module.exports = (res, p) => {
       }
     );
 
-
     cell(
       left +
         tw[0] +
@@ -739,7 +741,6 @@ module.exports = (res, p) => {
         ? d[0]
         : ''
     );
-
 
     cell(
       left +
@@ -757,10 +758,8 @@ module.exports = (res, p) => {
       }
     );
 
-
     y += rowH;
   }
-
 
   /* =======================================================
      Totals
@@ -771,7 +770,6 @@ module.exports = (res, p) => {
     bold: true
   };
 
-
   cell(
     left,
     y,
@@ -780,7 +778,6 @@ module.exports = (res, p) => {
     'Total earnings',
     tot
   );
-
 
   cell(
     left + tw[0],
@@ -794,7 +791,6 @@ module.exports = (res, p) => {
     }
   );
 
-
   cell(
     left +
       tw[0] +
@@ -805,7 +801,6 @@ module.exports = (res, p) => {
     'Total deductions',
     tot
   );
-
 
   cell(
     left +
@@ -822,9 +817,7 @@ module.exports = (res, p) => {
     }
   );
 
-
   y += 26 + 16;
-
 
   /* =======================================================
      5. Net pay
@@ -840,7 +833,6 @@ module.exports = (res, p) => {
     )
     .fill('#4f46e5');
 
-
   doc
     .fillColor('#ffffff')
     .font('Helvetica-Bold')
@@ -850,7 +842,6 @@ module.exports = (res, p) => {
       left + 16,
       y + 17
     );
-
 
   doc
     .fontSize(18)
@@ -865,9 +856,7 @@ module.exports = (res, p) => {
       }
     );
 
-
   y += 46 + 8;
-
 
   /* =======================================================
      Net pay in words
@@ -884,7 +873,6 @@ module.exports = (res, p) => {
     .strokeColor('#cbd5e1')
     .stroke();
 
-
   doc
     .fillColor('#475569')
     .font('Helvetica-Bold')
@@ -894,7 +882,6 @@ module.exports = (res, p) => {
       left + 10,
       y + 7
     );
-
 
   doc
     .fillColor('#0f172a')
@@ -910,9 +897,7 @@ module.exports = (res, p) => {
       }
     );
 
-
   y += 40 + 20;
-
 
   /* =======================================================
      6. Footer
@@ -920,7 +905,6 @@ module.exports = (res, p) => {
 
   const currentYear =
     new Date().getFullYear();
-
 
   doc
     .fillColor('#94a3b8')
@@ -935,7 +919,6 @@ module.exports = (res, p) => {
         align: 'center'
       }
     );
-
 
   doc.end();
 };

@@ -1,26 +1,28 @@
 -- =========================================================
--- PAYROLL MANAGEMENT SYSTEM DATABASE SCHEMA
--- PostgreSQL
+-- PAYROLL MANAGEMENT SYSTEM
+-- PostgreSQL Database Schema
 -- =========================================================
 
-
 -- =========================================================
--- ENUM TYPES
+-- ENUMS
 -- =========================================================
 
 DO $$
 BEGIN
-    CREATE TYPE user_role AS ENUM ('admin', 'employee');
+  CREATE TYPE user_role AS ENUM ('admin', 'employee');
 EXCEPTION
-    WHEN duplicate_object THEN NULL;
+  WHEN duplicate_object THEN NULL;
 END $$;
 
-
 DO $$
 BEGIN
-    CREATE TYPE leave_status AS ENUM ('pending', 'approved', 'rejected');
+  CREATE TYPE leave_status AS ENUM (
+    'pending',
+    'approved',
+    'rejected'
+  );
 EXCEPTION
-    WHEN duplicate_object THEN NULL;
+  WHEN duplicate_object THEN NULL;
 END $$;
 
 
@@ -29,106 +31,68 @@ END $$;
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS employees (
-    id SERIAL PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
 
-    -- Login / identity
-    emp_code VARCHAR(30) UNIQUE,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(150) UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
+  emp_code VARCHAR(50) UNIQUE NOT NULL,
 
-    role user_role NOT NULL DEFAULT 'employee',
+  name VARCHAR(100) NOT NULL,
 
-    -- Job information
-    designation VARCHAR(80),
-    department VARCHAR(80),
+  email VARCHAR(150) UNIQUE NOT NULL,
 
-    -- Personal information
-    gender VARCHAR(20),
-    dob DATE,
+  password_hash TEXT NOT NULL,
 
-    -- Salary information
-    ctc NUMERIC(12,2) NOT NULL DEFAULT 0,
-    basic NUMERIC(12,2) NOT NULL DEFAULT 0,
-    hra NUMERIC(12,2) NOT NULL DEFAULT 0,
-    special_allowance NUMERIC(12,2) NOT NULL DEFAULT 0,
-    lta NUMERIC(12,2) NOT NULL DEFAULT 0,
-    other_allowances NUMERIC(12,2) NOT NULL DEFAULT 0,
+  role user_role NOT NULL DEFAULT 'employee',
 
-    -- Government / bank information
-    pan VARCHAR(10),
-    pf_uan VARCHAR(12),
-    account_number VARCHAR(18),
-    ifsc_code VARCHAR(11),
+  designation VARCHAR(100),
 
-    -- Tax information
-    tax_regime VARCHAR(10) NOT NULL DEFAULT 'new'
-        CHECK (tax_regime IN ('new', 'old')),
+  department VARCHAR(100),
 
-    -- Employment dates
-    joining_date DATE,
-    resignation_date DATE,
+  gender VARCHAR(20),
 
-    -- Account status
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  dob DATE,
 
-    -- Basic date tracking
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
+  ctc NUMERIC(12,2) NOT NULL DEFAULT 0,
 
+  tax_regime VARCHAR(10) NOT NULL DEFAULT 'old'
+    CHECK (tax_regime IN ('old', 'new')),
 
--- =========================================================
--- ATTENDANCE
--- =========================================================
+  pan VARCHAR(10),
 
-CREATE TABLE IF NOT EXISTS attendance (
-    id SERIAL PRIMARY KEY,
+  pf_uan VARCHAR(12),
 
-    employee_id INT NOT NULL
-        REFERENCES employees(id)
-        ON DELETE CASCADE,
+  account_number VARCHAR(18),
 
-    work_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  ifsc_code VARCHAR(11),
 
-    status VARCHAR(20)
-        CHECK (status IN ('present', 'absent', 'leave')),
+  joining_date DATE,
 
-    day_type VARCHAR(10) NOT NULL DEFAULT 'full'
-        CHECK (day_type IN ('full', 'half')),
+  resignation_date DATE,
 
-    note TEXT,
+  -- =======================================================
+  -- MONTHLY SALARY STRUCTURE - EARNINGS
+  -- =======================================================
 
-    check_in TIMESTAMP,
-    check_out TIMESTAMP,
+  basic NUMERIC(12,2) NOT NULL DEFAULT 0,
 
-    UNIQUE (employee_id, work_date)
-);
+  hra NUMERIC(12,2) NOT NULL DEFAULT 0,
 
+  special_allowance NUMERIC(12,2) NOT NULL DEFAULT 0,
 
--- =========================================================
--- LEAVES
--- =========================================================
+  lta NUMERIC(12,2) NOT NULL DEFAULT 0,
 
-CREATE TABLE IF NOT EXISTS leaves (
-    id SERIAL PRIMARY KEY,
+  other_allowances NUMERIC(12,2) NOT NULL DEFAULT 0,
 
-    employee_id INT NOT NULL
-        REFERENCES employees(id)
-        ON DELETE CASCADE,
+  -- =======================================================
+  -- MONTHLY DEDUCTIONS
+  -- =======================================================
 
-    leave_type VARCHAR(30) NOT NULL
-        CHECK (leave_type IN ('casual', 'sick', 'paid')),
+  epf NUMERIC(12,2) NOT NULL DEFAULT 0,
 
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
+  professional_tax NUMERIC(12,2) NOT NULL DEFAULT 0,
 
-    reason TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
-    status leave_status NOT NULL DEFAULT 'pending',
-
-    applied_at TIMESTAMP NOT NULL DEFAULT NOW(),
-
-    CHECK (end_date >= start_date)
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 
@@ -137,60 +101,139 @@ CREATE TABLE IF NOT EXISTS leaves (
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS payslips (
-    id SERIAL PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
 
-    employee_id INT NOT NULL
-        REFERENCES employees(id)
-        ON DELETE CASCADE,
+  employee_id INT NOT NULL
+    REFERENCES employees(id)
+    ON DELETE CASCADE,
 
-    month INT NOT NULL
-        CHECK (month BETWEEN 1 AND 12),
+  month INT NOT NULL
+    CHECK (month BETWEEN 1 AND 12),
 
-    year INT NOT NULL
-        CHECK (year BETWEEN 2000 AND 2100),
+  year INT NOT NULL,
 
-    -- Salary components
-    basic NUMERIC(12,2) NOT NULL DEFAULT 0,
-    hra NUMERIC(12,2) NOT NULL DEFAULT 0,
-    special_allowance NUMERIC(12,2) NOT NULL DEFAULT 0,
-    lta NUMERIC(12,2) NOT NULL DEFAULT 0,
-    other_allowances NUMERIC(12,2) NOT NULL DEFAULT 0,
+  -- =======================================================
+  -- EARNINGS
+  -- =======================================================
 
-    -- Payroll totals
-    allowances NUMERIC(12,2) NOT NULL DEFAULT 0,
-    deductions NUMERIC(12,2) NOT NULL DEFAULT 0,
-    net_pay NUMERIC(12,2) NOT NULL DEFAULT 0,
+  basic NUMERIC(12,2) NOT NULL DEFAULT 0,
 
-    generated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  hra NUMERIC(12,2) NOT NULL DEFAULT 0,
 
-    UNIQUE (employee_id, month, year)
+  special_allowance NUMERIC(12,2) NOT NULL DEFAULT 0,
+
+  lta NUMERIC(12,2) NOT NULL DEFAULT 0,
+
+  other_allowances NUMERIC(12,2) NOT NULL DEFAULT 0,
+
+  -- Additional allowance entered during payroll generation
+  allowances NUMERIC(12,2) NOT NULL DEFAULT 0,
+
+  -- =======================================================
+  -- DEDUCTIONS
+  -- =======================================================
+
+  epf NUMERIC(12,2) NOT NULL DEFAULT 0,
+
+  professional_tax NUMERIC(12,2) NOT NULL DEFAULT 0,
+
+  -- Additional deduction entered during payroll generation
+  deductions NUMERIC(12,2) NOT NULL DEFAULT 0,
+
+  -- =======================================================
+  -- FINAL
+  -- =======================================================
+
+  net_pay NUMERIC(12,2) NOT NULL DEFAULT 0,
+
+  generated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+  UNIQUE (employee_id, month, year)
 );
 
 
 -- =========================================================
--- INDEXES
+-- ATTENDANCE
 -- =========================================================
 
-CREATE INDEX IF NOT EXISTS idx_employees_role
-    ON employees(role);
+CREATE TABLE IF NOT EXISTS attendance (
+  id SERIAL PRIMARY KEY,
 
-CREATE INDEX IF NOT EXISTS idx_employees_active
-    ON employees(is_active);
+  employee_id INT NOT NULL
+    REFERENCES employees(id)
+    ON DELETE CASCADE,
 
-CREATE INDEX IF NOT EXISTS idx_attendance_employee
-    ON attendance(employee_id);
+  work_date DATE NOT NULL DEFAULT CURRENT_DATE,
 
-CREATE INDEX IF NOT EXISTS idx_attendance_date
-    ON attendance(work_date);
+  status VARCHAR(20)
+    CHECK (status IN ('present', 'absent', 'leave')),
 
-CREATE INDEX IF NOT EXISTS idx_leaves_employee
-    ON leaves(employee_id);
+  day_type VARCHAR(10)
+    NOT NULL DEFAULT 'full'
+    CHECK (day_type IN ('full', 'half')),
 
-CREATE INDEX IF NOT EXISTS idx_leaves_status
-    ON leaves(status);
+  note TEXT,
 
-CREATE INDEX IF NOT EXISTS idx_payslips_employee
-    ON payslips(employee_id);
+  check_in TIMESTAMP,
 
-CREATE INDEX IF NOT EXISTS idx_payslips_period
-    ON payslips(year, month);
+  check_out TIMESTAMP,
+
+  UNIQUE (employee_id, work_date)
+);
+
+
+-- =========================================================
+-- LEAVES
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS leaves (
+  id SERIAL PRIMARY KEY,
+
+  employee_id INT NOT NULL
+    REFERENCES employees(id)
+    ON DELETE CASCADE,
+
+  leave_type VARCHAR(30) NOT NULL,
+
+  start_date DATE NOT NULL,
+
+  end_date DATE NOT NULL,
+
+  reason TEXT,
+
+  status leave_status NOT NULL DEFAULT 'pending',
+
+  applied_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+
+-- =========================================================
+-- MIGRATION SAFETY
+-- =========================================================
+-- If your existing database already exists, the following
+-- statements safely add the new columns.
+-- =========================================================
+
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS epf NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS professional_tax NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payslips
+  ADD COLUMN IF NOT EXISTS hra NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payslips
+  ADD COLUMN IF NOT EXISTS special_allowance NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payslips
+  ADD COLUMN IF NOT EXISTS lta NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payslips
+  ADD COLUMN IF NOT EXISTS other_allowances NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payslips
+  ADD COLUMN IF NOT EXISTS epf NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payslips
+  ADD COLUMN IF NOT EXISTS professional_tax NUMERIC(12,2) NOT NULL DEFAULT 0;

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+
 import api from '../../api';
+
 import {
   FiPlus,
   FiEdit2,
@@ -8,19 +10,18 @@ import {
   FiX,
   FiSave,
   FiUser,
-  FiMail,
-  FiBriefcase,
   FiCalendar,
-  FiDollarSign,
   FiCreditCard,
   FiCheckCircle,
   FiAlertCircle,
-  FiLock,
   FiUsers,
 } from 'react-icons/fi';
 
 import { FaRupeeSign } from 'react-icons/fa';
 
+/*
+ * Monthly salary components / earnings
+ */
 const salaryKeys = [
   'basic',
   'hra',
@@ -28,6 +29,27 @@ const salaryKeys = [
   'lta',
   'other_allowances',
 ];
+
+/*
+ * Monthly salary deductions
+ */
+const deductionKeys = [
+  'epf',
+  'professional_tax',
+];
+
+const salaryLabels = {
+  basic: 'Basic Salary',
+  hra: 'HRA (House Rent Allowance)',
+  special_allowance: 'Special Allowance',
+  lta: 'LTA (Leave Travel Allowance)',
+  other_allowances: 'Other Allowances',
+};
+
+const deductionLabels = {
+  epf: 'EPF (Employees\' Provident Fund)',
+  professional_tax: 'Professional Tax',
+};
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -45,11 +67,19 @@ const emptyForm = {
   resignation_date: '',
   ctc: '',
   tax_regime: 'old',
+
+  // Earnings
   basic: '',
   hra: '',
   special_allowance: '',
   lta: '',
   other_allowances: '',
+
+  // Deductions
+  epf: '',
+  professional_tax: '',
+
+  // Bank
   account_number: '',
   ifsc_code: '',
 };
@@ -102,6 +132,7 @@ function SectionHeader({ icon, title, description }) {
 
       <div>
         <h3>{title}</h3>
+
         {description && <p>{description}</p>}
       </div>
     </div>
@@ -111,20 +142,22 @@ function SectionHeader({ icon, title, description }) {
 export default function Employees() {
   const [employees, setEmployees] = useState([]);
   const [form, setForm] = useState(emptyForm);
+
   const [editingId, setEditingId] = useState(null);
-
   const [showForm, setShowForm] = useState(false);
-  const [search, setSearch] = useState('');
 
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [toast, setToast] = useState(null);
-
   const [errors, setErrors] = useState({});
 
   const showToast = (message, type = 'success') => {
-    setToast({ message, type });
+    setToast({
+      message,
+      type,
+    });
 
     setTimeout(() => {
       setToast(null);
@@ -137,13 +170,17 @@ export default function Employees() {
 
       const response = await api.get('/employees');
 
-      setEmployees(Array.isArray(response.data) ? response.data : []);
+      setEmployees(
+        Array.isArray(response.data)
+          ? response.data
+          : []
+      );
     } catch (error) {
       console.error(error);
 
       showToast(
         error.response?.data?.message ||
-        'Failed to load employees.',
+          'Failed to load employees.',
         'error'
       );
     } finally {
@@ -172,7 +209,9 @@ export default function Employees() {
       ]
         .filter(Boolean)
         .some((field) =>
-          String(field).toLowerCase().includes(value)
+          String(field)
+            .toLowerCase()
+            .includes(value)
         );
     });
   }, [employees, search]);
@@ -208,27 +247,46 @@ export default function Employees() {
       name: employee.name || '',
       email: employee.email || '',
       password: '',
+
       designation: employee.designation || '',
       gender: employee.gender || '',
+
       dob: employee.dob
         ? String(employee.dob).slice(0, 10)
         : '',
+
       pan: employee.pan || '',
       pf_uan: employee.pf_uan || '',
+
       joining_date: employee.joining_date
         ? String(employee.joining_date).slice(0, 10)
         : todayStr(),
+
       resignation_date: employee.resignation_date
         ? String(employee.resignation_date).slice(0, 10)
         : '',
+
       ctc: employee.ctc ?? '',
       tax_regime: employee.tax_regime || 'old',
+
+      // Earnings
       basic: employee.basic ?? '',
       hra: employee.hra ?? '',
-      special_allowance: employee.special_allowance ?? '',
+      special_allowance:
+        employee.special_allowance ?? '',
       lta: employee.lta ?? '',
-      other_allowances: employee.other_allowances ?? '',
-      account_number: employee.account_number || '',
+      other_allowances:
+        employee.other_allowances ?? '',
+
+      // Deductions
+      epf: employee.epf ?? '',
+      professional_tax:
+        employee.professional_tax ?? '',
+
+      // Bank
+      account_number:
+        employee.account_number || '',
+
       ifsc_code: employee.ifsc_code || '',
     });
 
@@ -247,39 +305,48 @@ export default function Employees() {
     const nextErrors = {};
 
     if (!form.emp_code.trim()) {
-      nextErrors.emp_code = 'Employee code is required.';
+      nextErrors.emp_code =
+        'Employee code is required.';
     }
 
     if (!form.name.trim()) {
-      nextErrors.name = 'Employee name is required.';
+      nextErrors.name =
+        'Employee name is required.';
     }
 
     if (!form.email.trim()) {
-      nextErrors.email = 'Email is required.';
+      nextErrors.email =
+        'Email is required.';
     }
 
     if (!editingId && !form.password.trim()) {
-      nextErrors.password = 'Password is required.';
+      nextErrors.password =
+        'Password is required.';
     }
 
     if (!form.designation.trim()) {
-      nextErrors.designation = 'Designation is required.';
+      nextErrors.designation =
+        'Designation is required.';
     }
 
     if (!form.gender) {
-      nextErrors.gender = 'Gender is required.';
+      nextErrors.gender =
+        'Gender is required.';
     }
 
     if (!form.dob) {
-      nextErrors.dob = 'Date of birth is required.';
+      nextErrors.dob =
+        'Date of birth is required.';
     }
 
     if (!form.pan.trim()) {
-      nextErrors.pan = 'PAN is required.';
+      nextErrors.pan =
+        'PAN is required.';
     }
 
     if (!form.pf_uan.trim()) {
-      nextErrors.pf_uan = 'PF UAN is required.';
+      nextErrors.pf_uan =
+        'PF UAN is required.';
     }
 
     if (!form.account_number.trim()) {
@@ -288,7 +355,8 @@ export default function Employees() {
     }
 
     if (!form.ifsc_code.trim()) {
-      nextErrors.ifsc_code = 'IFSC code is required.';
+      nextErrors.ifsc_code =
+        'IFSC code is required.';
     }
 
     if (!form.joining_date) {
@@ -310,16 +378,35 @@ export default function Employees() {
       form.ctc === null ||
       Number(form.ctc) < 0
     ) {
-      nextErrors.ctc = 'Enter a valid CTC.';
+      nextErrors.ctc =
+        'Enter a valid CTC.';
     }
 
+    /*
+     * Validate earnings
+     */
     salaryKeys.forEach((key) => {
       if (
         form[key] !== '' &&
         form[key] !== null &&
         Number(form[key]) < 0
       ) {
-        nextErrors[key] = 'Cannot be negative.';
+        nextErrors[key] =
+          'Cannot be negative.';
+      }
+    });
+
+    /*
+     * Validate deductions
+     */
+    deductionKeys.forEach((key) => {
+      if (
+        form[key] !== '' &&
+        form[key] !== null &&
+        Number(form[key]) < 0
+      ) {
+        nextErrors[key] =
+          'Cannot be negative.';
       }
     });
 
@@ -349,33 +436,75 @@ export default function Employees() {
       emp_code: form.emp_code.trim(),
       name: form.name.trim(),
       email: form.email.trim(),
-      designation: form.designation.trim(),
+
+      designation:
+        form.designation.trim(),
+
       gender: form.gender,
       dob: form.dob,
-      pan: form.pan.trim().toUpperCase(),
+
+      pan: form.pan
+        .trim()
+        .toUpperCase(),
+
       pf_uan: form.pf_uan.trim(),
-      joining_date: form.joining_date,
-      resignation_date: form.resignation_date || null,
+
+      joining_date:
+        form.joining_date,
+
+      resignation_date:
+        form.resignation_date || null,
+
       ctc: Number(form.ctc),
-      tax_regime: form.tax_regime,
-      account_number: form.account_number.trim(),
-      ifsc_code: form.ifsc_code.trim().toUpperCase(),
+
+      tax_regime:
+        form.tax_regime,
+
+      account_number:
+        form.account_number.trim(),
+
+      ifsc_code: form.ifsc_code
+        .trim()
+        .toUpperCase(),
     };
 
+    /*
+     * Earnings
+     */
     salaryKeys.forEach((key) => {
       payload[key] =
-        form[key] === '' || form[key] === null
+        form[key] === '' ||
+        form[key] === null
           ? 0
           : Number(form[key]);
     });
 
+    /*
+     * Deductions
+     */
+    deductionKeys.forEach((key) => {
+      payload[key] =
+        form[key] === '' ||
+        form[key] === null
+          ? 0
+          : Number(form[key]);
+    });
+
+    /*
+     * Password only when provided.
+     */
     if (form.password.trim()) {
-      payload.password = form.password;
+      payload.password =
+        form.password;
     }
 
     return payload;
   };
 
+  /*
+   * Prevent Enter from accidentally submitting
+   * the employee form.
+   */
   const handleKeyDown = (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -390,6 +519,7 @@ export default function Employees() {
         'Please correct the highlighted fields.',
         'error'
       );
+
       return;
     }
 
@@ -404,22 +534,28 @@ export default function Employees() {
           payload
         );
 
-        showToast('Employee updated successfully.');
+        showToast(
+          'Employee updated successfully.'
+        );
       } else {
-        await api.post('/employees', payload);
+        await api.post(
+          '/employees',
+          payload
+        );
 
-        showToast('Employee added successfully.');
+        showToast(
+          'Employee added successfully.'
+        );
       }
 
       await loadEmployees();
-
       closeForm();
     } catch (error) {
       console.error(error);
 
       showToast(
         error.response?.data?.message ||
-        'Failed to save employee.',
+          'Failed to save employee.',
         'error'
       );
     } finally {
@@ -435,9 +571,13 @@ export default function Employees() {
     if (!confirmed) return;
 
     try {
-      await api.delete(`/employees/${employee.id}`);
+      await api.delete(
+        `/employees/${employee.id}`
+      );
 
-      showToast('Employee deleted successfully.');
+      showToast(
+        'Employee deleted successfully.'
+      );
 
       await loadEmployees();
     } catch (error) {
@@ -445,14 +585,17 @@ export default function Employees() {
 
       showToast(
         error.response?.data?.message ||
-        'Failed to delete employee.',
+          'Failed to delete employee.',
         'error'
       );
     }
   };
 
   const fieldClass = (fieldName) =>
-    `employee-input ${errors[fieldName] ? 'has-error' : ''
+    `employee-input ${
+      errors[fieldName]
+        ? 'has-error'
+        : ''
     }`;
 
   return (
@@ -829,10 +972,6 @@ export default function Employees() {
           background: #f8fafc;
         }
 
-        /*
-          Fixed widths keep the Actions column close to its header
-          and prevent it from drifting to the far right.
-        */
         .employee-table th:nth-child(1),
         .employee-table td:nth-child(1) {
           width: 85px;
@@ -1201,7 +1340,11 @@ export default function Employees() {
         <button
           type="button"
           className="employee-primary-btn"
-          onClick={showForm ? closeForm : openCreateForm}
+          onClick={
+            showForm
+              ? closeForm
+              : openCreateForm
+          }
         >
           {showForm ? (
             <>
@@ -1241,6 +1384,7 @@ export default function Employees() {
           </div>
 
           <div className="employee-form-body">
+
             {/* BASIC DETAILS */}
             <div className="employee-section">
               <SectionHeader
@@ -1250,10 +1394,13 @@ export default function Employees() {
               />
 
               <div className="employee-form-grid">
+
                 <div className="employee-field">
                   <label className="employee-label">
                     Employee Code{' '}
-                    <span className="employee-required">*</span>
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -1274,7 +1421,9 @@ export default function Employees() {
                 <div className="employee-field">
                   <label className="employee-label">
                     Employee Name{' '}
-                    <span className="employee-required">*</span>
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -1295,7 +1444,9 @@ export default function Employees() {
                 <div className="employee-field">
                   <label className="employee-label">
                     Email{' '}
-                    <span className="employee-required">*</span>
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -1350,7 +1501,9 @@ export default function Employees() {
                 <div className="employee-field">
                   <label className="employee-label">
                     Designation{' '}
-                    <span className="employee-required">*</span>
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -1371,22 +1524,36 @@ export default function Employees() {
                 <div className="employee-field">
                   <label className="employee-label">
                     Gender{' '}
-                    <span className="employee-required">*</span>
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <select
                     name="gender"
                     value={form.gender}
                     onChange={handleChange}
-                    className={`employee-select ${errors.gender ? 'has-error' : ''
-                      }`}
+                    className={`employee-select ${
+                      errors.gender
+                        ? 'has-error'
+                        : ''
+                    }`}
                   >
                     <option value="">
                       Select gender
                     </option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
+
+                    <option value="male">
+                      Male
+                    </option>
+
+                    <option value="female">
+                      Female
+                    </option>
+
+                    <option value="other">
+                      Other
+                    </option>
                   </select>
 
                   {errors.gender && (
@@ -1399,7 +1566,9 @@ export default function Employees() {
                 <div className="employee-field">
                   <label className="employee-label">
                     Date of Birth{' '}
-                    <span className="employee-required">*</span>
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -1419,8 +1588,10 @@ export default function Employees() {
 
                 <div className="employee-field">
                   <label className="employee-label">
-                    PAN{' '}
-                    <span className="employee-required">*</span>
+                    PAN (Permanent Account Number){' '}
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -1441,8 +1612,10 @@ export default function Employees() {
 
                 <div className="employee-field">
                   <label className="employee-label">
-                    PF UAN{' '}
-                    <span className="employee-required">*</span>
+                    PF UAN (Provident Fund Universal Account Number){' '}
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -1459,6 +1632,7 @@ export default function Employees() {
                     </div>
                   )}
                 </div>
+
               </div>
             </div>
 
@@ -1471,10 +1645,13 @@ export default function Employees() {
               />
 
               <div className="employee-form-grid">
+
                 <div className="employee-field">
                   <label className="employee-label">
                     Joining Date{' '}
-                    <span className="employee-required">*</span>
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -1511,22 +1688,26 @@ export default function Employees() {
                     </div>
                   )}
                 </div>
+
               </div>
             </div>
 
-            {/* SALARY */}
+            {/* SALARY & TAX */}
             <div className="employee-section">
               <SectionHeader
                 icon={<FaRupeeSign size={18} />}
                 title="Salary & Tax"
-                description="CTC and monthly salary structure"
+                description="Cost to Company and monthly salary structure"
               />
 
               <div className="employee-form-grid">
+
                 <div className="employee-field">
                   <label className="employee-label">
-                    Annual CTC{' '}
-                    <span className="employee-required">*</span>
+                    Annual CTC (Cost to Company){' '}
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -1560,33 +1741,33 @@ export default function Employees() {
                     <option value="old">
                       Old Regime
                     </option>
+
                     <option value="new">
                       New Regime
                     </option>
                   </select>
                 </div>
+
               </div>
 
-              <div style={{ height: 18 }} />
+              <div style={{ height: 22 }} />
 
+              {/* MONTHLY SALARY STRUCTURE */}
               <SectionHeader
                 icon={<FaRupeeSign size={18} />}
-                title="Monthly Salary Structure"
-                description="Enter the monthly salary components"
+                title="Monthly Salary Structure (Earnings)"
+                description="Enter the employee's monthly earnings"
               />
 
               <div className="employee-form-grid">
+
                 {salaryKeys.map((key) => (
                   <div
                     className="employee-field"
                     key={key}
                   >
                     <label className="employee-label">
-                      {key
-                        .replace(/_/g, ' ')
-                        .replace(/\b\w/g, (char) =>
-                          char.toUpperCase()
-                        )}
+                      {salaryLabels[key]}
                     </label>
 
                     <input
@@ -1606,10 +1787,51 @@ export default function Employees() {
                     )}
                   </div>
                 ))}
+
               </div>
             </div>
 
-            {/* BANK */}
+            {/* DEDUCTIONS */}
+            <div className="employee-section">
+              <SectionHeader
+                icon={<FaRupeeSign size={18} />}
+                title="Deductions"
+                description="Enter the employee's monthly salary deductions"
+              />
+
+              <div className="employee-form-grid">
+
+                {deductionKeys.map((key) => (
+                  <div
+                    className="employee-field"
+                    key={key}
+                  >
+                    <label className="employee-label">
+                      {deductionLabels[key]}
+                    </label>
+
+                    <input
+                      type="number"
+                      min="0"
+                      name={key}
+                      value={form[key]}
+                      onChange={handleChange}
+                      className={fieldClass(key)}
+                      placeholder="0"
+                    />
+
+                    {errors[key] && (
+                      <div className="employee-error">
+                        {errors[key]}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+              </div>
+            </div>
+
+            {/* BANK DETAILS */}
             <div className="employee-section">
               <SectionHeader
                 icon={<FiCreditCard size={18} />}
@@ -1618,10 +1840,13 @@ export default function Employees() {
               />
 
               <div className="employee-form-grid">
+
                 <div className="employee-field">
                   <label className="employee-label">
                     Account Number{' '}
-                    <span className="employee-required">*</span>
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -1643,15 +1868,19 @@ export default function Employees() {
 
                 <div className="employee-field">
                   <label className="employee-label">
-                    IFSC Code{' '}
-                    <span className="employee-required">*</span>
+                    IFSC Code (Indian Financial System Code){' '}
+                    <span className="employee-required">
+                      *
+                    </span>
                   </label>
 
                   <input
                     name="ifsc_code"
                     value={form.ifsc_code}
                     onChange={handleChange}
-                    className={fieldClass('ifsc_code')}
+                    className={fieldClass(
+                      'ifsc_code'
+                    )}
                     placeholder="SBIN0001234"
                   />
 
@@ -1661,11 +1890,13 @@ export default function Employees() {
                     </div>
                   )}
                 </div>
+
               </div>
             </div>
 
             {/* FORM ACTIONS */}
             <div className="employee-form-actions">
+
               <button
                 type="button"
                 className="employee-secondary-btn"
@@ -1689,20 +1920,25 @@ export default function Employees() {
                     ? 'Update Employee'
                     : 'Save Employee'}
               </button>
+
             </div>
+
           </div>
         </form>
       )}
 
       {/* EMPLOYEE TABLE */}
       <div className="employees-table-card">
+
         <div className="employees-table-toolbar">
+
           <div className="employees-table-title">
             <FiUsers size={18} />
             Employee List
           </div>
 
           <div className="employee-search">
+
             <FiSearch
               className="employee-search-icon"
               size={17}
@@ -1716,41 +1952,48 @@ export default function Employees() {
               }
               placeholder="Search by name, code, email..."
             />
+
           </div>
+
         </div>
 
         <div className="employee-table-wrapper">
+
           <table className="employee-table">
+
             <thead>
               <tr>
                 <th>ID</th>
                 <th>Employee</th>
-
-                {/* EMAIL INSTEAD OF DEPARTMENT */}
                 <th>Email</th>
-
                 <th>Designation</th>
                 <th>CTC</th>
-
-                {/* ACTIONS COLUMN HAS FIXED WIDTH */}
                 <th>Actions</th>
               </tr>
             </thead>
 
             <tbody>
+
               {loading ? (
                 <tr>
                   <td colSpan="6">
+
                     <div className="employee-loading">
+
                       <div className="employee-loading-spinner" />
+
                       Loading employees...
+
                     </div>
+
                   </td>
                 </tr>
               ) : filteredEmployees.length === 0 ? (
                 <tr>
                   <td colSpan="6">
+
                     <div className="employee-empty">
+
                       <div className="employee-empty-icon">
                         <FiUsers size={22} />
                       </div>
@@ -1764,12 +2007,15 @@ export default function Employees() {
                           ? 'Try changing your search.'
                           : 'Add your first employee to get started.'}
                       </div>
+
                     </div>
+
                   </td>
                 </tr>
               ) : (
                 filteredEmployees.map((employee) => (
                   <tr key={employee.id}>
+
                     <td>
                       <span className="employee-id">
                         #{employee.id}
@@ -1778,11 +2024,13 @@ export default function Employees() {
 
                     <td>
                       <div className="employee-name-cell">
+
                         <div className="employee-avatar">
                           <FiUser size={16} />
                         </div>
 
                         <div className="employee-name-content">
+
                           <div className="employee-name">
                             {employee.name || '-'}
                           </div>
@@ -1790,11 +2038,12 @@ export default function Employees() {
                           <div className="employee-code">
                             {employee.emp_code || '-'}
                           </div>
+
                         </div>
+
                       </div>
                     </td>
 
-                    {/* EMAIL */}
                     <td>
                       <span
                         className="employee-email"
@@ -1807,7 +2056,9 @@ export default function Employees() {
                     <td>
                       <span
                         className="employee-designation"
-                        title={employee.designation || ''}
+                        title={
+                          employee.designation || ''
+                        }
                       >
                         {employee.designation || '-'}
                       </span>
@@ -1819,17 +2070,23 @@ export default function Employees() {
                       </span>
                     </td>
 
-                    {/* ACTIONS */}
                     <td>
                       <div className="employee-actions">
+
                         <button
                           type="button"
                           className="employee-action-btn employee-edit-btn"
                           onClick={() =>
                             openEditForm(employee)
                           }
-                          title={`Edit ${employee.name || 'employee'}`}
-                          aria-label={`Edit ${employee.name || 'employee'}`}
+                          title={`Edit ${
+                            employee.name ||
+                            'employee'
+                          }`}
+                          aria-label={`Edit ${
+                            employee.name ||
+                            'employee'
+                          }`}
                         >
                           <FiEdit2 size={14} />
                           <span>Edit</span>
@@ -1841,21 +2098,33 @@ export default function Employees() {
                           onClick={() =>
                             handleDelete(employee)
                           }
-                          title={`Delete ${employee.name || 'employee'}`}
-                          aria-label={`Delete ${employee.name || 'employee'}`}
+                          title={`Delete ${
+                            employee.name ||
+                            'employee'
+                          }`}
+                          aria-label={`Delete ${
+                            employee.name ||
+                            'employee'
+                          }`}
                         >
                           <FiTrash2 size={14} />
                           <span>Delete</span>
                         </button>
+
                       </div>
                     </td>
+
                   </tr>
                 ))
               )}
+
             </tbody>
+
           </table>
+
         </div>
       </div>
+
     </div>
   );
 }
