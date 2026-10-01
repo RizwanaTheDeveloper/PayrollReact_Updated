@@ -48,6 +48,7 @@ router.get(
         -- Deductions
         epf,
         professional_tax,
+        advance,
         deductions,
 
         -- Final
@@ -180,11 +181,15 @@ router.post(
       req.body?.year
     );
 
-    const extra = num(
-      req.body?.allowances
-    );
+    // const extra = num(
+    //   req.body?.allowances
+    // );
 
-    const additionalDeduction = 0;
+    // const additionalDeduction = 0;
+
+    const extra = num(req.body?.allowances);
+    const advance = num(req.body?.advance);
+    const additionalDeduction = num(req.body?.deductions);
 
     const mode = String(
       req.body?.mode || 'generate'
@@ -256,7 +261,7 @@ router.post(
     }
 
     if (
-      extra < 0 ||
+      extra < 0 ||  advance < 0 ||
       additionalDeduction < 0 ||
       (epfOverride !== null &&
         epfOverride < 0) ||
@@ -362,6 +367,7 @@ router.post(
           -- Deductions
           epf,
           professional_tax,
+          advance,
           deductions,
 
           -- Final
@@ -419,6 +425,21 @@ router.post(
             ELSE $7::numeric
           END,
 
+          -- Advance deducted only in the joining month
+          CASE
+            WHEN e.joining_date >= make_date(
+                $3::int,
+                $2::int,
+                1
+              )
+              AND e.joining_date < (
+                make_date($3::int, $2::int, 1)
+                + INTERVAL '1 month'
+              )::date
+              THEN COALESCE(e.advance, 0)
+            ELSE 0
+          END,
+
           -- Additional deduction
           $5::numeric,
 
@@ -459,6 +480,20 @@ router.post(
               ELSE $7::numeric
             END
 
+            - CASE
+              WHEN e.joining_date >= make_date(
+                  $3::int,
+                  $2::int,
+                  1
+                )
+                AND e.joining_date < (
+                  make_date($3::int, $2::int, 1)
+                  + INTERVAL '1 month'
+                )::date
+                THEN COALESCE(e.advance, 0)
+              ELSE 0
+            END
+
             - $5::numeric
           )
 
@@ -487,6 +522,7 @@ router.post(
               allowances = EXCLUDED.allowances,
               epf = EXCLUDED.epf,
               professional_tax = EXCLUDED.professional_tax,
+              advance = EXCLUDED.advance,
               deductions = EXCLUDED.deductions,
               net_pay = EXCLUDED.net_pay`
             : 'DO NOTHING'
@@ -601,13 +637,13 @@ router.get(
           e.designation,
           e.emp_code,
           e.gender,
-          e.dob,
+          e.dob::text AS dob,
           e.pan,
           e.pf_uan,
           e.account_number,
           e.ifsc_code,
           e.tax_regime,
-          e.joining_date,
+          e.joining_date::text AS joining_date,
           e.resignation_date,
           e.is_active
 

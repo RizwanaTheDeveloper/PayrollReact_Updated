@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS employees (
 
   ctc NUMERIC(12,2) NOT NULL DEFAULT 0,
 
+  advance NUMERIC(12,2) DEFAULT 0,
+
   tax_regime VARCHAR(10) NOT NULL DEFAULT 'old'
     CHECK (tax_regime IN ('old', 'new')),
 
@@ -137,6 +139,8 @@ CREATE TABLE IF NOT EXISTS payslips (
 
   professional_tax NUMERIC(12,2) NOT NULL DEFAULT 0,
 
+  advance NUMERIC(12,2) NOT NULL DEFAULT 0,
+
   -- Additional deduction entered during payroll generation
   deductions NUMERIC(12,2) NOT NULL DEFAULT 0,
 
@@ -220,6 +224,12 @@ ALTER TABLE employees
 ALTER TABLE employees
   ADD COLUMN IF NOT EXISTS professional_tax NUMERIC(12,2) NOT NULL DEFAULT 0;
 
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS advance NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE employees
+  ALTER COLUMN advance DROP NOT NULL;
+
 ALTER TABLE payslips
   ADD COLUMN IF NOT EXISTS hra NUMERIC(12,2) NOT NULL DEFAULT 0;
 
@@ -237,3 +247,6 @@ ALTER TABLE payslips
 
 ALTER TABLE payslips
   ADD COLUMN IF NOT EXISTS professional_tax NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payslips
+  ADD COLUMN IF NOT EXISTS advance NUMERIC(12,2) NOT NULL DEFAULT 0;

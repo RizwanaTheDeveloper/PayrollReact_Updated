@@ -38,6 +38,7 @@ const DATES = [
 
 const NUMS = [
   'ctc',
+  'advance',
 
   // Earnings
   'basic',
@@ -73,6 +74,7 @@ const OUT = `
   dob::text AS dob,
 
   ctc,
+  advance,
 
   pan,
   pf_uan,
@@ -179,6 +181,13 @@ function clean(body) {
       continue;
     }
 
+    if (
+      key === 'advance' &&
+      (body[key] === '' || body[key] === null)
+    ) {
+      values[key] = null;
+      continue;
+    }
 
     const number = Number(body[key]) || 0;
 

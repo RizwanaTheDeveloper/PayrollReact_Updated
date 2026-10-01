@@ -67,6 +67,7 @@ const emptyForm = {
   resignation_date: '',
   ctc: '',
   tax_regime: 'new',
+  advance: '',
 
   // Earnings
   basic: '',
@@ -304,6 +305,7 @@ export default function Employees() {
 
       ctc: employee.ctc ?? '',
       tax_regime: employee.tax_regime || 'old',
+      advance: employee.advance ?? '',
 
       // Earnings
       basic: employee.basic ?? '',
@@ -416,6 +418,15 @@ export default function Employees() {
     ) {
       nextErrors.ctc =
         'Enter a valid CTC.';
+    }
+
+    if (
+      form.advance !== '' &&
+      form.advance !== null &&
+      Number(form.advance) < 0
+    ) {
+      nextErrors.advance =
+        'Cannot be negative.';
     }
 
     /*
@@ -531,6 +542,10 @@ export default function Employees() {
         form.resignation_date || null,
 
       ctc: Number(form.ctc),
+      advance:
+        form.advance === '' || form.advance === null
+          ? null
+          : Number(form.advance),
 
       tax_regime:
         form.tax_regime,
@@ -1820,6 +1835,29 @@ export default function Employees() {
                     </option>
 
                   </select>
+                </div>
+
+                <div className="employee-field">
+                  <label className="employee-label">
+                    Advance
+                  </label>
+
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    name="advance"
+                    value={form.advance}
+                    onChange={handleChange}
+                    className={fieldClass('advance')}
+                    placeholder="0"
+                  />
+
+                  {errors.advance && (
+                    <div className="employee-error">
+                      {errors.advance}
+                    </div>
+                  )}
                 </div>
 
               </div>

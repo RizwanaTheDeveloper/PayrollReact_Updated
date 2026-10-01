@@ -214,6 +214,7 @@ export default function Payroll() {
         other_allowances: 0,
         epf: 0,
         professional_tax: 0,
+        advance: 0,
       };
     }
 
@@ -231,6 +232,7 @@ export default function Payroll() {
       professional_tax: num(
         selectedEmployee.professional_tax
       ),
+      advance: num(selectedEmployee.advance),
     };
   }, [selectedEmployee]);
 
@@ -239,6 +241,18 @@ export default function Payroll() {
   // =========================================================
 
   const calculation = useMemo(() => {
+    const joiningDate = String(
+      selectedEmployee?.joining_date || ''
+    ).slice(0, 10);
+    const joiningYear = Number(joiningDate.slice(0, 4));
+    const joiningMonth = Number(joiningDate.slice(5, 7));
+    const advanceForMonth =
+      joiningDate &&
+      Number(form.month) === joiningMonth &&
+      Number(form.year) === joiningYear
+        ? salary.advance
+        : 0;
+
     const gross =
       salary.basic +
       salary.hra +
@@ -249,17 +263,19 @@ export default function Payroll() {
 
     const totalDeductions =
       salary.epf +
-      salary.professional_tax;
+      salary.professional_tax +
+      advanceForMonth;
 
     const netPay =
       gross - totalDeductions;
 
     return {
       gross,
+      advance: advanceForMonth,
       totalDeductions,
       netPay,
     };
-  }, [salary, form.allowances]);
+  }, [salary, form.allowances, form.month, form.year, selectedEmployee]);
 
   // =========================================================
   // CHANGE
@@ -1421,6 +1437,15 @@ export default function Payroll() {
                       )}
                     </strong>
                   </div>
+
+                  {calculation.advance > 0 && (
+                    <div className="calc-row deduction">
+                      <span>Advance</span>
+                      <strong>
+                        -{money(calculation.advance)}
+                      </strong>
+                    </div>
+                  )}
 
                   <div className="calc-row deduction">
                     <span>

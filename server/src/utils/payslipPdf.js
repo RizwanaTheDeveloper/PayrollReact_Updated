@@ -751,6 +751,9 @@ module.exports = (res, p) => {
       'Professional Tax',
       p.professional_tax,
     ],
+    ...(num(p.advance) > 0
+      ? [['Advance', p.advance]]
+      : []),
   ];
 
   const totalEarnings =

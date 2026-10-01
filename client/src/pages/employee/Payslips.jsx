@@ -1368,6 +1368,8 @@ export default function Payslips() {
                       getAllowances(p);
                     const deductions =
                       getDeductions(p);
+                    const totalDeductions =
+                      deductions + Number(p.advance || 0);
 
                     return (
                       <tr key={p.id}>
@@ -1398,7 +1400,12 @@ export default function Payslips() {
                         </td>
 
                         <td className="negative">
-                          -{money(deductions)}
+                          -{money(totalDeductions)}
+                          {Number(p.advance || 0) > 0 && (
+                            <small style={{ display: 'block' }}>
+                              Advance: -{money(p.advance)}
+                            </small>
+                          )}
                         </td>
 
                         <td>
@@ -1497,6 +1504,15 @@ export default function Payslips() {
                           -{money(deductions)}
                         </strong>
                       </div>
+
+                      {Number(p.advance || 0) > 0 && (
+                        <div className="mobile-breakdown-item">
+                          <span>Advance</span>
+                          <strong className="negative">
+                            -{money(p.advance)}
+                          </strong>
+                        </div>
+                      )}
                     </div>
 
                     <button
