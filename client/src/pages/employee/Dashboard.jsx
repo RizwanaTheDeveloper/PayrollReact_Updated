@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api, { downloadPayslip } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -8,6 +9,8 @@ import {
   FiCheckCircle,
   FiClock,
   FiDownload,
+  FiEye,
+  FiEyeOff,
   FiFileText,
   FiRefreshCw,
   FiXCircle,
@@ -138,6 +141,7 @@ export default function Dashboard() {
 
   const [downloading, setDownloading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [hideSalary, setHideSalary] = useState(false);
 
   const loadDashboard = async (showRefresh = false) => {
     try {
@@ -380,6 +384,12 @@ export default function Dashboard() {
           STAT CARDS
       ===================================================== */}
 
+      <nav className="design-employee-shortcuts" aria-label="Daily tasks">
+        <Link to="/employee/attendance"><FiClock aria-hidden="true" />My attendance</Link>
+        <Link to="/employee/leaves"><FiCalendar aria-hidden="true" />Request leave</Link>
+        <Link to="/employee/payslips"><FiFileText aria-hidden="true" />View my pay</Link>
+      </nav>
+
       <section className="employee-stats">
         <StatCard
           icon={FiClock}
@@ -433,11 +443,14 @@ export default function Dashboard() {
             </div>
 
             <div className="card-heading">
-              <h2>Latest Payslip</h2>
+              <h2>My latest payslip</h2>
               <p>
                 Your most recent salary statement
               </p>
             </div>
+            <button type="button" className="design-salary-toggle" aria-label={hideSalary ? 'Show salary amount' : 'Hide salary amount'} aria-pressed={hideSalary} onClick={() => setHideSalary(!hideSalary)}>
+              {hideSalary ? <FiEyeOff aria-hidden="true" /> : <FiEye aria-hidden="true" />}
+            </button>
           </div>
 
           {slip ? (
@@ -457,7 +470,7 @@ export default function Dashboard() {
                 <span>Net Pay</span>
 
                 <strong>
-                  {formatCurrency(
+                  {hideSalary ? '••••••' : formatCurrency(
                     slip.net_pay
                   )}
                 </strong>

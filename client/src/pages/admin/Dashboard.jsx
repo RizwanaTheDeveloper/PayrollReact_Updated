@@ -4,9 +4,9 @@ import api from '../../api';
 
 import {
   FiUsers,
+  FiClipboard,
   FiCalendar,
   FiClock,
-  FiDollarSign,
   FiUserPlus,
   FiFileText,
   FiCheckCircle,
@@ -15,7 +15,6 @@ import {
   FiInbox,
   FiAlertCircle
 } from 'react-icons/fi';
-import { FaRupeeSign } from 'react-icons/fa';
 
 const money = (v) =>
   v == null
@@ -123,7 +122,7 @@ export default function Dashboard() {
     {
       label: 'Monthly Payroll',
       value: money(s.monthlyPayroll),
-      icon: FaRupeeSign,
+      icon: FiClipboard,
       color: 'purple',
       to: '/admin/payroll'
     }
@@ -172,14 +171,16 @@ export default function Dashboard() {
 
       <div className="page-head">
         <div>
-          <h1>Admin Dashboard</h1>
+          <h1>Payroll overview</h1>
 
           <p>
-            Overview of your workforce,
-            attendance and payroll
+            {new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+            {' · Workforce, attendance and payroll'}
           </p>
         </div>
 
+        <div className="design-overview-actions">
+        <Link to="/admin/payroll" className="design-primary-link"><FiArrowRight aria-hidden="true" />Open payroll</Link>
         <button
           className="secondary dashboard-refresh"
           type="button"
@@ -200,6 +201,7 @@ export default function Dashboard() {
               : 'Refresh'}
           </span>
         </button>
+        </div>
       </div>
 
 
@@ -334,7 +336,7 @@ export default function Dashboard() {
             <div className="section-title-row">
 
               <h3>
-                Pending Leave Requests
+                Your action queue · Leave requests
               </h3>
 
               {pending.length > 0 && (

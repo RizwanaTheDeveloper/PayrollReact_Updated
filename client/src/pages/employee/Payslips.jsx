@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import api, { downloadPayslip } from '../../api';
+import { loanDeductionItems } from '../../utils/payrollDeductions';
 
 import {
   FiCalendar,
@@ -71,7 +72,7 @@ const getAllowances = (p) => {
 const getDeductions = (p) => {
   return (
     Number(p.professional_tax || 0) +
-    Number(p.epf || 0)
+    Number(p.epf || 0) + Number(p.deductions || 0)
   );
 };
 
@@ -1401,11 +1402,11 @@ export default function Payslips() {
 
                         <td className="negative">
                           -{money(totalDeductions)}
-                          {Number(p.advance || 0) > 0 && (
-                            <small style={{ display: 'block' }}>
-                              Advance: -{money(p.advance)}
+                          {loanDeductionItems(p).map((entry) => (
+                            <small key={entry.id} style={{ display: 'block' }}>
+                              {entry.label}: -{money(entry.amount)}
                             </small>
-                          )}
+                          ))}
                         </td>
 
                         <td>
@@ -1501,18 +1502,18 @@ export default function Payslips() {
                       <div className="mobile-breakdown-item">
                         <span>Deductions</span>
                         <strong className="negative">
-                          -{money(deductions)}
+                          -{money(deductions + Number(p.advance || 0))}
                         </strong>
                       </div>
 
-                      {Number(p.advance || 0) > 0 && (
-                        <div className="mobile-breakdown-item">
-                          <span>Advance</span>
+                      {loanDeductionItems(p).map((entry) => (
+                        <div className="mobile-breakdown-item" key={entry.id}>
+                          <span>{entry.label}</span>
                           <strong className="negative">
-                            -{money(p.advance)}
+                            -{money(entry.amount)}
                           </strong>
                         </div>
-                      )}
+                      ))}
                     </div>
 
                     <button

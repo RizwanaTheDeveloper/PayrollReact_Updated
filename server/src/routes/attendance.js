@@ -2,18 +2,20 @@ const router = require('express').Router();
 const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { authenticate, authorize } = require('../middleware/auth');
+const { attendanceWithLeavePolicy } = require('../utils/leavePolicy');
 
 router.use(authenticate);
 
-const STATUSES = ['present', 'absent', 'leave'];
+const STATUSES = ['present', 'absent', 'leave', 'paid_leave'];
 const DAY_TYPES = ['full', 'half'];
 const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
 
 // GET /api/attendance/my  (employee: only their own records)
 router.get('/my', asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, work_date::text AS work_date, status, day_type, note, check_in, check_out
-     FROM attendance WHERE employee_id = $1 ORDER BY work_date DESC`, [req.user.id]);
+    `${attendanceWithLeavePolicy}
+     SELECT id, work_date::text AS work_date, status, day_type, note, check_in, check_out
+     FROM policy_attendance WHERE employee_id = $1 ORDER BY work_date DESC`, [req.user.id]);
   res.json(rows);
 }));
 
@@ -23,9 +25,10 @@ router.get('/day', authorize('admin'), asyncHandler(async (req, res) => {
   const { date } = req.query;
   if (!isDate(date)) return res.status(400).json({ message: 'date (YYYY-MM-DD) is required' });
   const { rows } = await pool.query(
-    `SELECT e.id AS employee_id, e.name, a.status, a.day_type, a.note
+    `${attendanceWithLeavePolicy}
+     SELECT e.id AS employee_id, e.name, a.status, a.recorded_status, a.day_type, a.note
      FROM employees e
-     LEFT JOIN attendance a ON a.employee_id = e.id AND a.work_date = $1
+     LEFT JOIN policy_attendance a ON a.employee_id = e.id AND a.work_date = $1
      WHERE e.role = 'employee' AND e.is_active
      ORDER BY e.name`, [date]);
   res.json(rows);
@@ -72,6 +75,7 @@ router.put('/bulk', authorize('admin'), asyncHandler(async (req, res) => {
   }
 }));
 
+
 // GET /api/attendance?month=1-12&year=YYYY[&employee_id=][&date=]   (admin)
 router.get('/', authorize('admin'), asyncHandler(async (req, res) => {
   const { month, year, employee_id, date } = req.query;
@@ -84,9 +88,10 @@ router.get('/', authorize('admin'), asyncHandler(async (req, res) => {
   }
   if (employee_id) { vals.push(employee_id); where.push(`a.employee_id = $${vals.length}`); }
   const { rows } = await pool.query(
-    `SELECT a.id, a.employee_id, e.name, a.work_date::text AS work_date,
+    `${attendanceWithLeavePolicy}
+     SELECT a.id, a.employee_id, e.name, a.work_date::text AS work_date,
             a.status, a.day_type, a.note, a.check_in, a.check_out
-     FROM attendance a JOIN employees e ON e.id = a.employee_id
+     FROM policy_attendance a JOIN employees e ON e.id = a.employee_id
      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
      ORDER BY a.work_date DESC, e.name`, vals);
   res.json(rows);

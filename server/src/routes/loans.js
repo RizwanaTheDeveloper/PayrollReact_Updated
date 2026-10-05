@@ -1,0 +1,141 @@
+const router = require('express').Router();
+const pool = require('../config/db');
+const asyncHandler = require('../utils/asyncHandler');
+const { authenticate, authorize } = require('../middleware/auth');
+const { LOCK } = require('../utils/loanRecovery');
+const loanAmounts = require('../utils/loanAmounts');
+
+router.use(authenticate);
+
+const REGISTER = `SELECT a.*, a.first_recovery::text, a.disbursed_on::text,
+  e.name, e.emp_code, COALESCE(r.recovered, 0) AS recovered,
+  CASE WHEN a.instalment_count IS NOT NULL THEN ROUND(a.amount * a.interest_percentage / 100, 2) END AS monthly_interest_amount,
+  ROUND(a.amount * a.interest_percentage / 100, 2) * COALESCE(a.instalment_count, 1) AS interest_amount,
+  a.amount + ROUND(a.amount * a.interest_percentage / 100, 2) * COALESCE(a.instalment_count, 1) AS total_repayable,
+  a.amount + ROUND(a.amount * a.interest_percentage / 100, 2) * COALESCE(a.instalment_count, 1) - COALESCE(r.recovered, 0) AS outstanding,
+  COALESCE((SELECT json_agg(json_build_object('month', p.month, 'year', p.year, 'amount', ar.amount))
+    FROM advance_recoveries ar JOIN payslips p ON p.id = ar.payslip_id
+    WHERE ar.advance_id = a.id), '[]'::json) AS period_recoveries,
+  CASE WHEN a.status IN ('approved', 'active', 'paused') AND a.amount + ROUND(a.amount * a.interest_percentage / 100, 2) * COALESCE(a.instalment_count, 1) = COALESCE(r.recovered, 0)
+    THEN 'completed' ELSE a.status END AS status
+  FROM advances a JOIN employees e ON e.id = a.employee_id
+  LEFT JOIN LATERAL (SELECT SUM(amount) AS recovered FROM advance_recoveries
+    WHERE advance_id = a.id) r ON TRUE`;
+
+router.get('/', authorize('admin'), asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(`${REGISTER}
+    ORDER BY (a.status = 'pending') DESC, a.created_at DESC, a.id DESC`);
+  res.json(rows);
+}));
+
+router.get('/my', authorize('employee'), asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(`${REGISTER} WHERE a.employee_id = $1 ORDER BY a.created_at DESC, a.id DESC`, [req.user.id]);
+  res.json(rows);
+}));
+
+router.get('/:id', authorize('admin', 'employee'), asyncHandler(async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) return res.status(400).json({ message: 'Invalid loan ID.' });
+  const { rows } = await pool.query(`${REGISTER} WHERE a.id = $1
+    AND ($2::int IS NULL OR a.employee_id = $2)`, [req.params.id, req.user.role === 'employee' ? req.user.id : null]);
+  if (!rows.length) return res.status(404).json({ message: 'Loan not found.' });
+  const recoveries = await pool.query(`SELECT r.amount, p.id AS payslip_id, p.month, p.year
+    FROM advance_recoveries r JOIN payslips p ON p.id = r.payslip_id
+    WHERE r.advance_id = $1 ORDER BY p.year, p.month`, [req.params.id]);
+  const events = await pool.query(`SELECT v.action, v.note, v.created_at, e.name AS actor
+    FROM advance_events v LEFT JOIN employees e ON e.id = v.actor_id
+    WHERE advance_id = $1 ORDER BY v.id DESC`, [req.params.id]);
+  res.json({ ...rows[0], recoveries: recoveries.rows, events: events.rows });
+}));
+
+const money = (v) => /^(?:\d+)(?:\.\d{1,2})?$/.test(String(v)) && Number(v) > 0 && Number(v) < 1e10;
+const date = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
+  && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v;
+
+router.post('/', authorize('employee'), asyncHandler(async (req, res) => {
+  const employee_id = req.user.id;
+  const { amount, instalment: requestedInstalment, instalment_count, interest_percentage = 0, first_recovery, reason } = req.body || {};
+  const validInterest = /^(?:\d+)(?:\.\d{1,2})?$/.test(String(interest_percentage))
+    && Number(interest_percentage) >= 0 && Number(interest_percentage) <= 100;
+  // Older API requests retain their one-time terms; new requests specify a count.
+  const hasCount = instalment_count !== undefined;
+  const validCount = !hasCount || (/^\d+$/.test(String(instalment_count))
+    && Number(instalment_count) >= 1 && Number(instalment_count) <= 360
+    && Number(instalment_count) <= Math.round(Number(amount) * 100));
+  const amounts = money(amount) && validInterest && validCount
+    ? loanAmounts(amount, interest_percentage, hasCount ? instalment_count : null) : { total: 0, instalment: 0 };
+  const totalRepayable = amounts.total;
+  // Calculate payroll deduction on the server, rather than trusting a submitted amount.
+  const instalment = hasCount ? amounts.instalment.toFixed(2) : requestedInstalment;
+  if (!Number.isInteger(Number(employee_id)) || Number(employee_id) <= 0 || !money(amount)
+    || !validInterest || !validCount || !money(instalment) || Number(instalment) > totalRepayable || Number(instalment) >= 1e10
+    || !date(first_recovery) || !first_recovery.endsWith('-01')
+    || typeof reason !== 'string' || !reason.trim() || reason.length > 2000) {
+    return res.status(400).json({ message: 'Provide a positive loan amount (up to 2 decimals), monthly interest from 0 to 100%, 1 to 360 instalments (at least one paise of principal per instalment), a first recovery month and a reason. Total repayment is principal plus monthly interest for all instalments.' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(`INSERT INTO advances
+      (employee_id, amount, instalment, first_recovery, reason, created_by, interest_percentage, instalment_count, status)
+      SELECT id, $2, $3, $4, $5, $6, $7, $8, 'pending' FROM employees
+      WHERE id = $1 AND role = 'employee' AND is_active RETURNING id`,
+    [employee_id, amount, instalment, first_recovery, reason.trim(), req.user.id, interest_percentage, hasCount ? Number(instalment_count) : null]);
+    if (!result.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ message: 'Only active employees can request a loan.' });
+    }
+    await client.query(`INSERT INTO advance_events (advance_id, actor_id, action, note)
+      VALUES ($1, $2, 'created', $3)`, [result.rows[0].id, req.user.id, reason.trim()]);
+    await client.query('COMMIT');
+    res.status(201).json(result.rows[0]);
+  } catch (err) { await client.query('ROLLBACK'); throw err; }
+  finally { client.release(); }
+}));
+
+router.patch('/:id/status', authorize('admin'), asyncHandler(async (req, res) => {
+  const { action, note = '', disbursed_on, payment_reference } = req.body || {};
+  const transitions = { approve: ['pending', 'approved'], reject: ['pending', 'rejected'],
+    disburse: ['approved', 'active'], pause: ['active', 'paused'], resume: ['paused', 'active'] };
+  if (!/^\d+$/.test(req.params.id) || !Object.hasOwn(transitions, action)
+    || typeof note !== 'string' || note.length > 2000) {
+    return res.status(400).json({ message: 'Invalid loan action.' });
+  }
+  if (['reject', 'pause', 'resume'].includes(action) && !note.trim()) {
+    return res.status(400).json({ message: 'Provide a reason for this decision.' });
+  }
+  if (action === 'disburse' && (!date(disbursed_on)
+    || disbursed_on > new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+    || typeof payment_reference !== 'string' || !payment_reference.trim() || payment_reference.length > 150)) {
+    return res.status(400).json({ message: 'Provide a payment date (today or earlier) and payment reference.' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(LOCK);
+    const { rows } = await client.query('SELECT * FROM advances WHERE id = $1 FOR UPDATE', [req.params.id]);
+    const loan = rows[0];
+    if (!loan) { await client.query('ROLLBACK'); return res.status(404).json({ message: 'Loan not found.' }); }
+    if (loan.status !== transitions[action][0]) {
+      await client.query('ROLLBACK'); return res.status(409).json({ message: 'Status changed. Refresh and review the loan.' });
+    }
+    const recovered = await client.query('SELECT COALESCE(SUM(amount),0) AS amount FROM advance_recoveries WHERE advance_id=$1', [loan.id]);
+    if (Number(recovered.rows[0].amount) >= loanAmounts(loan.amount, loan.interest_percentage, loan.instalment_count).total) {
+      await client.query('ROLLBACK'); return res.status(409).json({ message: 'This loan has been fully recovered.' });
+    }
+    await client.query(`UPDATE advances SET status=$2,
+      disbursed_on=COALESCE($3::date, disbursed_on), payment_reference=COALESCE($4, payment_reference)
+      WHERE id=$1`, [loan.id, transitions[action][1], action === 'disburse' ? disbursed_on : null,
+      action === 'disburse' ? payment_reference.trim() : null]);
+    await client.query(`INSERT INTO advance_events (advance_id, actor_id, action, note) VALUES ($1,$2,$3,$4)`,
+      [loan.id, req.user.id, action, action === 'disburse' ? `${disbursed_on} · ${payment_reference.trim()}${note ? ` · ${note}` : ''}` : note.trim()]);
+    await client.query('COMMIT');
+    res.json({ message: 'Loan updated.' });
+  } catch (err) { await client.query('ROLLBACK'); throw err; }
+  finally { client.release(); }
+}));
+
+router.use((err, req, res, next) => {
+  console.error('Loans request failed:', err.code || err.name);
+  res.status(500).json({ message: 'Unable to save or load loans. Please try again.' });
+});
+module.exports = router;

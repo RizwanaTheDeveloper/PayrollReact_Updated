@@ -248,7 +248,7 @@ router.patch(
           SELECT
             $1,
             d::date,
-            'leave',
+            $5,
             'full',
             $4
           FROM generate_series(
@@ -261,14 +261,15 @@ router.patch(
             work_date
           )
           DO UPDATE SET
-            status = 'leave',
+            status = EXCLUDED.status,
             day_type = 'full',
             note = EXCLUDED.note`,
           [
             leave.employee_id,
             leave.start_date,
             leave.end_date,
-            `${leave.leave_type} leave (approved)`
+            `${leave.leave_type} leave (approved)`,
+            leave.leave_type === 'paid' ? 'paid_leave' : 'leave'
           ]
         );
       }

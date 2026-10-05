@@ -71,15 +71,23 @@ const calculateHours = (attendance) =>
 
 const LABEL = {
   present: 'Present',
-  absent: 'Absent',
+  absent: 'Unpaid Leave',
   leave: 'Leave',
+  paid_leave: 'Paid Leave',
 };
 
 const BADGE = {
   present: 'approved',
   absent: 'rejected',
   leave: 'pending',
+  paid_leave: 'approved',
 };
+
+const ATTENDANCE_CHOICES = [
+  { label: 'Full Day', status: 'present', day_type: 'full', Icon: FiSun },
+  { label: 'Half Day', status: 'present', day_type: 'half', Icon: FiClock },
+  { label: 'Leave', status: 'leave', day_type: 'full', Icon: FiCalendar },
+];
 
 /* =========================================================
    MARK DAY
@@ -113,6 +121,7 @@ function MarkDay() {
         data.map((employee) => ({
           ...employee,
           status: employee.status || '',
+          loaded_status: employee.status || '',
           day_type: employee.day_type || 'full',
           note: employee.note || '',
         }))
@@ -171,9 +180,9 @@ function MarkDay() {
 
     try {
       const records = rows.map(
-        ({ employee_id, status, day_type, note }) => ({
+        ({ employee_id, status, loaded_status, recorded_status, day_type, note }) => ({
           employee_id,
-          status,
+          status: status === loaded_status ? (recorded_status ?? status) : status,
           day_type,
           note,
         })
@@ -209,7 +218,7 @@ function MarkDay() {
     ).length;
 
     const leave = rows.filter(
-      (row) => row.status === 'leave'
+      (row) => ['leave', 'paid_leave'].includes(row.status)
     ).length;
 
     const unmarked = rows.filter(
@@ -254,7 +263,7 @@ function MarkDay() {
             <FiXCircle />
           </div>
           <div>
-            <span>Absent</span>
+            <span>Unpaid Leave</span>
             <strong>{summary.absent}</strong>
           </div>
         </div>
@@ -399,8 +408,7 @@ function MarkDay() {
             <thead>
               <tr>
                 <th>Employee</th>
-                <th>Status</th>
-                <th>Day Type</th>
+                <th>Attendance</th>
                 <th>Note</th>
               </tr>
             </thead>
@@ -426,50 +434,30 @@ function MarkDay() {
                     </div>
                   </td>
 
-                  <td data-label="Status">
-                    <select
-                      className={`attendance-select status-select ${
-                        row.status || 'not-marked'
-                      }`}
-                      value={row.status}
-                      onChange={(event) =>
-                        update(row.employee_id, {
-                          status: event.target.value,
-                        })
-                      }
-                    >
-                      <option value="">Not marked</option>
-                      <option value="present">
-                        Present
-                      </option>
-                      <option value="absent">
-                        Absent
-                      </option>
-                      <option value="leave">
-                        Leave
-                      </option>
-                    </select>
-                  </td>
-
-                  <td data-label="Day Type">
-                    <select
-                      className="attendance-select"
-                      value={row.day_type}
-                      disabled={!row.status}
-                      onChange={(event) =>
-                        update(row.employee_id, {
-                          day_type: event.target.value,
-                        })
-                      }
-                    >
-                      <option value="full">
-                        Full Day
-                      </option>
-
-                      <option value="half">
-                        Half Day
-                      </option>
-                    </select>
+                  <td data-label="Attendance">
+                    <div className="attendance-choice-grid" role="group" aria-label={`Attendance for ${row.name}`}>
+                      {ATTENDANCE_CHOICES.map(({ label, status, day_type, Icon }) => {
+                        const selected = row.status === status && row.day_type === day_type;
+                        return (
+                          <button
+                            key={label}
+                            type="button"
+                            className={`attendance-choice ${status} ${selected ? 'selected' : ''}`}
+                            aria-pressed={selected}
+                            disabled={saving}
+                            onClick={() => update(row.employee_id, {
+                              status: selected ? '' : status,
+                              day_type,
+                            })}
+                          >
+                            <Icon />
+                            <span>{label}</span>
+                            {selected && <FiCheck className="choice-check" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {row.status === 'absent' && <small>Previously marked Unpaid Leave. Select a card to change.</small>}
                   </td>
 
                   <td data-label="Note">
@@ -526,6 +514,34 @@ function MarkDay() {
       </div>
 
       <style>{`
+        .attendance-choice-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(100px, 110px));
+          gap: 6px;
+          min-width: 0;
+          overflow-x: auto;
+        }
+        .attendance-choice {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          min-height: 44px;
+          padding: 8px 10px;
+          border: 1px solid #dbe3ef;
+          border-radius: 8px;
+          background: #fff;
+          color: #475569;
+          font: inherit;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .attendance-choice:hover { border-color: #2563eb; background: #eff6ff; }
+        .attendance-choice:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+        .attendance-choice.selected { border-color: #059669; background: #ecfdf5; color: #047857; }
+        .attendance-choice.leave.selected { border-color: #d97706; background: #fffbeb; color: #b45309; }
+        .attendance-choice:disabled { opacity: .6; cursor: wait; }
+        .choice-check { margin-left: auto; }
         .attendance-section {
           width: 100%;
         }
@@ -1320,7 +1336,7 @@ function Records() {
     ).length;
 
     const leave = list.filter(
-      (item) => item.status === 'leave'
+      (item) => ['leave', 'paid_leave'].includes(item.status)
     ).length;
 
     const completed = list.filter(
@@ -1347,7 +1363,7 @@ function Records() {
           <div>
             <h2>Monthly Attendance Records</h2>
             <p>
-              Review attendance, working hours and leave records.
+              The first two leave days each month are paid. Additional days count as unpaid leave.
             </p>
           </div>
         </div>
@@ -1445,7 +1461,7 @@ function Records() {
           </div>
 
           <div>
-            <span>Absent</span>
+            <span>Unpaid Leave</span>
             <strong>{summary.absent}</strong>
           </div>
         </div>

@@ -742,6 +742,8 @@ module.exports = (res, p) => {
     ],
   ];
 
+  const loanRecoveries = Array.isArray(p.advance_recoveries) ? p.advance_recoveries : [];
+  const salaryAdvance = Math.round((num(p.advance) - loanRecoveries.reduce((sum, entry) => sum + num(entry.amount), 0)) * 100) / 100;
   const deductions = [
     [
       "EPF (Employees' Provident Fund)",
@@ -751,8 +753,12 @@ module.exports = (res, p) => {
       'Professional Tax',
       p.professional_tax,
     ],
-    ...(num(p.advance) > 0
-      ? [['Advance', p.advance]]
+    ...loanRecoveries.map((entry) => [`Loan LOAN-${entry.advance_id} (incl. interest)`, entry.amount]),
+    ...(salaryAdvance > 0
+      ? [[loanRecoveries.length ? 'Salary advance' : 'Loan / salary advance', salaryAdvance]]
+      : []),
+    ...(num(p.deductions) > 0
+      ? [['Additional deductions', p.deductions]]
       : []),
   ];
 

@@ -1,6 +1,8 @@
 const router = require('express').Router();
 
 const pool = require('../config/db');
+const { LOCK, planRecoveries, saveRecoveries } = require('../utils/loanRecovery');
+const { calcPayDays } = require('../utils/payDays');
 
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -52,9 +54,11 @@ router.get(
         deductions,
 
         -- Final
-        net_pay
+        net_pay,
+        COALESCE((SELECT json_agg(json_build_object('advance_id', r.advance_id, 'amount', r.amount) ORDER BY r.advance_id)
+          FROM advance_recoveries r WHERE r.payslip_id = p.id), '[]'::json) AS advance_recoveries
 
-      FROM payslips
+      FROM payslips p
 
       WHERE employee_id = $1
 
@@ -116,7 +120,9 @@ router.get(
         SELECT
           p.*,
           e.name,
-          e.emp_code
+          e.emp_code,
+          COALESCE((SELECT json_agg(json_build_object('advance_id', r.advance_id, 'amount', r.amount))
+            FROM advance_recoveries r WHERE r.payslip_id = p.id), '[]'::json) AS advance_recoveries
 
         FROM payslips p
 
@@ -348,8 +354,30 @@ router.post(
     // GENERATE / UPDATE PAYSLIP
     // -----------------------------------------------------
 
-    const { rowCount } =
-      await pool.query(
+    const client = await pool.connect();
+    let rowCount;
+    try {
+      await client.query('BEGIN');
+      await client.query(LOCK);
+      await planRecoveries(client, only, month, year);
+      await client.query(`CREATE TEMP TABLE payroll_leave_plan (
+        employee_id integer PRIMARY KEY, amount numeric NOT NULL
+      ) ON COMMIT DROP`);
+      const { rows: employees } = await client.query(
+        `SELECT e.id,
+          COALESCE(e.basic, 0) + COALESCE(e.hra, 0)
+          + COALESCE(e.special_allowance, 0) + COALESCE(e.lta, 0)
+          + COALESCE(e.other_allowances, 0) AS monthly_salary
+         FROM employees e WHERE ${ELIGIBLE} ${existingCheck}
+           AND COALESCE(e.basic, 0) > 0`, [only, month, year]);
+      for (const employee of employees) {
+        const days = await calcPayDays(employee.id, month, year, client);
+        const amount = Math.round(num(employee.monthly_salary)
+          * (days.employedDays - days.netPaidDays) / days.monthDays * 100) / 100;
+        await client.query('INSERT INTO payroll_leave_plan (employee_id, amount) VALUES ($1, $2)',
+          [employee.id, amount]);
+      }
+      const result = await client.query(
         `
         INSERT INTO payslips (
           employee_id,
@@ -438,10 +466,10 @@ router.post(
               )::date
               THEN COALESCE(e.advance, 0)
             ELSE 0
-          END,
+          END + COALESCE((SELECT SUM(plan.amount) FROM payroll_loan_plan plan WHERE plan.employee_id = e.id), 0),
 
           -- Additional deduction
-          $5::numeric,
+          $5::numeric + COALESCE(leave_plan.amount, 0),
 
           -- ---------------------------------------------
           -- NET PAY
@@ -494,10 +522,13 @@ router.post(
               ELSE 0
             END
 
+            - COALESCE((SELECT SUM(plan.amount) FROM payroll_loan_plan plan WHERE plan.employee_id = e.id), 0)
             - $5::numeric
+            - COALESCE(leave_plan.amount, 0)
           )
 
         FROM employees e
+        LEFT JOIN payroll_leave_plan leave_plan ON leave_plan.employee_id = e.id
 
         WHERE ${ELIGIBLE}
 
@@ -527,6 +558,7 @@ router.post(
               net_pay = EXCLUDED.net_pay`
             : 'DO NOTHING'
         }
+        RETURNING id
         `,
         [
           only,
@@ -538,6 +570,13 @@ router.post(
           professionalTaxOverride,
         ]
       );
+      rowCount = result.rowCount;
+      await saveRecoveries(client, result.rows.map((row) => row.id));
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally { client.release(); }
 
     // -----------------------------------------------------
     // RESPONSE
@@ -572,14 +611,16 @@ router.delete(
   '/:id',
   authorize('admin'),
   asyncHandler(async (req, res) => {
-    const { rowCount } =
-      await pool.query(
-        `
-        DELETE FROM payslips
-        WHERE id = $1
-        `,
-        [req.params.id]
-      );
+    const client = await pool.connect();
+    let rowCount;
+    try {
+      await client.query('BEGIN');
+      await client.query(LOCK);
+      const result = await client.query('DELETE FROM payslips WHERE id = $1', [req.params.id]);
+      rowCount = result.rowCount;
+      await client.query('COMMIT');
+    } catch (err) { await client.query('ROLLBACK'); throw err; }
+    finally { client.release(); }
 
     if (!rowCount) {
       return res.status(404).json({
@@ -632,6 +673,8 @@ router.get(
           p.*,
 
           -- Employee information
+          COALESCE((SELECT json_agg(json_build_object('advance_id', r.advance_id, 'amount', r.amount) ORDER BY r.advance_id)
+            FROM advance_recoveries r WHERE r.payslip_id = p.id), '[]'::json) AS advance_recoveries,
           e.name,
           e.email,
           e.designation,

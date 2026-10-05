@@ -1,0 +1,356 @@
+/* Shared sizing rules override the styles embedded in individual pages. */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+/* Keep the admin loan register inside its panel, including the review action. */
+#root .loan-register-panel {
+  container: loan-register / inline-size;
+}
+#root .loan-register-panel .loan-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+#root .loan-register-panel .loan-table :is(th, td) {
+  padding: 18px 14px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#root .loan-register-panel .loan-table th:first-child { width: 26%; }
+#root .loan-register-panel .loan-table th:nth-child(3) { width: 112px; }
+#root .loan-register-panel .loan-table :is(th, td):nth-child(3) {
+  text-align: left;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+#root .loan-register-panel .loan-table :is(th, td):nth-child(4) {
+  width: 104px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+#root .loan-register-panel .loan-table :is(th, td):nth-child(5) {
+  width: 96px;
+  padding-left: 12px;
+  padding-right: 16px;
+}
+#root .loan-register-panel .loan-employee { width: 100%; gap: 8px; }
+#root .loan-register-panel .loan-employee > span:last-child { min-width: 0; }
+#root .loan-register-panel .loan-avatar { width: 36px; height: 36px; }
+#root .loan-register-panel .loan-table th {
+  padding-block: 14px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #526581;
+  background: #f5f7fc;
+}
+#root .loan-register-panel .loan-table td { vertical-align: middle; }
+#root .loan-register-panel .loan-table td strong { font-variant-numeric: tabular-nums; font-weight: 650; color: var(--text); }
+#root .loan-register-panel .loan-table small { font-size: 12px; line-height: 1.5; margin-top: 3px; }
+#root .loan-register-panel .loan-reference { font-size: 11px; letter-spacing: .03em; }
+#root .loan-register-panel .loan-table .loan-badge { font-size: 12px; padding: 6px 8px; white-space: nowrap; }
+#root .loan-register-panel .loan-table .loan-button {
+  width: 100%; padding: 8px 6px; min-height: 40px; font-size: 13px;
+  white-space: nowrap; overflow-wrap: normal; border-radius: 10px;
+  background: var(--primary-l); border-color: transparent; color: var(--primary-d);
+}
+#root .loan-register-panel .loan-table .loan-button:hover { background: #dce5ff; }
+#root .loan-register-panel .loan-table tr.is-selected { background: #f4f7ff; }
+#root .loan-register-panel .loan-table tbody tr:hover { background: #f8faff; }
+@container loan-register (max-width: 520px) {
+  #root .loan-register-panel .loan-table thead { display: none; }
+  #root .loan-register-panel .loan-table,
+  #root .loan-register-panel .loan-table tbody { display: block; }
+  #root .loan-register-panel .loan-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  #root .loan-register-panel .loan-table tbody td {
+    min-width: 0;
+    width: auto;
+    padding: 0;
+    border: 0;
+  }
+  #root .loan-register-panel .loan-table td:first-child,
+  #root .loan-register-panel .loan-table td[colspan] { grid-column: 1 / -1; }
+  #root .loan-register-panel .loan-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  #root .loan-register-panel .loan-table td:first-child::before { display: none; }
+  #root .loan-register-panel .loan-table :is(th, td):nth-child(3) { text-align: left; padding: 0; }
+  #root .loan-register-panel .loan-table td:is(:nth-child(4), :nth-child(5)) { width: auto; padding: 0; }
+}
+#root .design-content {
+  container: workspace / inline-size;
+}
+#root .design-content > div,
+#root
+  .design-content
+  :is(
+    .card,
+    .dashboard-card,
+    .loan-panel,
+    .form-group,
+    .field,
+    .employee-field
+  ),
+#root
+  :is(
+    .main-grid,
+    .dashboard-grid,
+    .form-grid,
+    .salary-grid,
+    .loan-workspace,
+    .loan-form-grid
+  )
+  > * {
+  min-width: 0;
+}
+#root :is(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+#root textarea {
+  resize: vertical;
+}
+#root
+  :is(
+    .summary-value,
+    .stat-value,
+    .salary-box strong,
+    .net-box strong,
+    .employee-name,
+    .loan-employee-dropdown small
+  ) {
+  overflow-wrap: anywhere;
+}
+#root
+  :is(
+    .table-wrap,
+    .employee-table-wrapper,
+    .loan-table-wrap,
+    .dashboard-table-wrap,
+    .leaves-table-wrap,
+    .records-table-wrap,
+    .attendance-table-wrap,
+    .payslip-table-wrap
+  ) {
+  max-width: 100%;
+  overscroll-behavior-inline: contain;
+}
+#root .design-sidebar {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+#root :is(.design-topbar-left, .design-topbar-right, .design-company > div) {
+  min-width: 0;
+}
+#root .design-topbar-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#root .design-bottom-navigation {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+#root .design-bottom-navigation a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#root .design-login > * {
+  min-width: 0;
+}
+
+/* Use the content width so tablet layouts also account for the sidebar. */
+@container workspace (max-width: 950px) {
+  #root :is(.main-grid, .dashboard-grid, .loan-workspace) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #root
+    :is(
+      .dashboard-stats,
+      .employee-stats,
+      .quick-actions,
+      .leaves-summary,
+      .leaves-summary-grid,
+      .attendance-summary,
+      .records-summary
+    ) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container workspace (max-width: 600px) {
+  #root
+    :is(
+      .form-grid,
+      .employee-form-grid,
+      .leave-form-grid,
+      .loan-form-grid,
+      .loan-filters
+    ) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #root :is(.form-grid, .employee-form-grid, .leave-form-grid) > * {
+    grid-column: auto;
+  }
+  #root :is(.summary-grid, .loan-summary, .salary-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #root
+    :is(
+      .page-head,
+      .payroll-header,
+      .employees-header,
+      .leaves-header,
+      .loan-page-head,
+      .attendance-page-head,
+      .payslip-page-head,
+      .dashboard-header,
+      .employees-table-toolbar,
+      .loan-panel-head
+    ) {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  #root
+    :is(
+      .page-head,
+      .payroll-header,
+      .employees-header,
+      .leaves-header,
+      .loan-page-head,
+      .attendance-page-head,
+      .payslip-page-head,
+      .dashboard-header
+    ) {
+    flex-direction: column;
+  }
+  #root
+    :is(
+      .page-head,
+      .payroll-header,
+      .employees-header,
+      .leaves-header,
+      .loan-page-head,
+      .attendance-page-head,
+      .payslip-page-head,
+      .dashboard-header
+    )
+    > button {
+    width: 100%;
+    justify-content: center;
+  }
+  #root :is(.employee-search, .month-field) {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+  #root
+    :is(
+      .loan-head-actions,
+      .loan-detail-actions,
+      .design-overview-actions,
+      .form-actions
+    ) {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  #root
+    :is(
+      .loan-head-actions,
+      .loan-detail-actions,
+      .design-overview-actions,
+      .form-actions
+    )
+    > :is(button, a) {
+    flex: 1 1 180px;
+  }
+  #root .loan-schedule > div {
+    flex-wrap: wrap;
+  }
+}
+@container workspace (max-width: 380px) {
+  #root
+    :is(
+      .dashboard-stats,
+      .employee-stats,
+      .quick-actions,
+      .leaves-summary,
+      .leaves-summary-grid,
+      .attendance-summary,
+      .records-summary,
+      .payslip-summary
+    ) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #root :is(.attendance-title-wrap, .payslip-title-wrap, .payroll-header-left) {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  #root .design-sidebar {
+    width: min(300px, calc(100vw - 24px));
+  }
+}
+@media (max-width: 760px) {
+  #root :is(.design-login-form-panel, .design-login-brand) {
+    padding-inline: clamp(16px, 4vw, 24px);
+  }
+  #root .design-topbar {
+    padding-inline: 12px;
+    gap: 8px;
+  }
+  #root .design-topbar-left {
+    gap: 10px;
+  }
+  #root .design-content {
+    padding-inline: clamp(12px, 3vw, 16px);
+  }
+  #root .design-content button {
+    min-height: 44px;
+  }
+  .loan-dialog {
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+  }
+  .loan-dialog-body {
+    padding: 18px;
+  }
+  .loan-dialog-actions {
+    padding: 16px 18px;
+    flex-wrap: wrap;
+  }
+  .loan-dialog-actions .loan-button {
+    flex: 1 1 180px;
+  }
+  .loan-dialog .loan-panel-head {
+    padding: 18px;
+    align-items: flex-start;
+  }
+}
+@media (max-width: 380px) {
+  #root .design-bottom-navigation a {
+    font-size: 11px;
+  }
+  #root .design-company strong {
+    font-size: 17px;
+  }
+  #root :is(.employees-title, .leaves-title) {
+    flex-wrap: wrap;
+  }
+  .loan-repayment-breakdown > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .loan-repayment-breakdown dd {
+    text-align: left;
+  }
+}
+

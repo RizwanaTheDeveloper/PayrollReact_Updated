@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('./config/env');
 const express = require('express');
 const cors = require('cors');
 
@@ -6,6 +6,7 @@ const app = express();
 
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://127.0.0.1:5173',
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
@@ -35,6 +36,10 @@ app.use('/api/employees', require('./routes/employees'));
 app.use('/api/payslips', require('./routes/payslips'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/leaves', require('./routes/leaves'));
+// Retain the old URL for existing clients; both endpoints use the loans route.
+app.use('/api/advances', require('./routes/loans'));
+app.use('/api/loans', require('./routes/loans'));
+app.use('/api/reports', require('./routes/reports'));
 
 process.on('uncaughtException', (err) => console.error('UNCAUGHT:', err));
 process.on('unhandledRejection', (err) => console.error('UNHANDLED:', err));
@@ -43,6 +48,21 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: `Cannot ${req.method} ${req.originalUrl}` });
 });
 
-app.listen(process.env.PORT || 5000, () =>
-  console.log(`API running on port ${process.env.PORT || 5000}`)
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is missing. Set a private signing secret in server/.env before starting the API.');
+}
+
+const port = process.env.PORT || 5000;
+const server = app.listen(port, () =>
+  console.log(`API running on port ${port}`)
 );
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${port} is already in use. Stop the existing server before starting this API again.`);
+  } else {
+    console.error('API failed to start:', err);
+  }
+
+  process.exit(1);
+});

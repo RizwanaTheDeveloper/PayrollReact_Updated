@@ -5,8 +5,11 @@
   "scripts": {
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
-    "db:init": "psql \"$DATABASE_URL\" -f src/schema.sql",
-    "seed": "node scripts/seed.js"
+    "db:init": "node scripts/init-db.js",
+    "seed": "node scripts/seed.js",
+    "test:loans": "node scripts/test-loans.js",
+    "test:leaves": "node scripts/test-leaves.js",
+    "test:reports": "node scripts/test-reports.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

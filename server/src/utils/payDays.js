@@ -1,5 +1,6 @@
 // server/src/utils/payDays.js
 const pad = (n) => String(n).padStart(2, '0');
+const { attendanceWithLeavePolicy } = require('./leavePolicy');
 
 /* ---- Adjust these to match your tables ---- */
 const ATT = { table: 'attendance', emp: 'employee_id', date: 'work_date', status: 'status' };
@@ -26,7 +27,7 @@ async function calcPayDays(employeeId, month, year, db) {
   const joining_date = emp[0]?.joining_date || null;
   const resignation_date = emp[0]?.resignation_date || null;
 
-  const none = { monthDays, employedDays: 0, netPaidDays: 0, joining_date, resignation_date };
+  const none = { monthDays, employedDays: 0, netPaidDays: 0, unpaidLeaveDays: 0, joining_date, resignation_date };
   let first = 1, last = monthDays;
 
   if (joining_date) {
@@ -41,14 +42,19 @@ async function calcPayDays(employeeId, month, year, db) {
 
   const absent = new Set();
 
-  // Attendance rows marked absent / LOP
+  // Effective attendance includes leave days beyond the monthly allowance.
   const { rows: att } = await db.query(
-    `SELECT to_char(${ATT.date},'YYYY-MM-DD') AS d, LOWER(${ATT.status}::text) AS s
-     FROM ${ATT.table} WHERE ${ATT.emp}=$1 AND ${ATT.date} BETWEEN $2 AND $3`,
+    `${attendanceWithLeavePolicy}
+     SELECT to_char(${ATT.date},'YYYY-MM-DD') AS d, LOWER(${ATT.status}::text) AS s
+     FROM policy_attendance WHERE ${ATT.emp}=$1 AND ${ATT.date} BETWEEN $2 AND $3`,
     [employeeId, startStr, endStr]);
-  for (const a of att) if (ATT_UNPAID.includes(a.s)) absent.add(Number(a.d.slice(8, 10)));
+  for (const a of att) {
+    const day = Number(a.d.slice(8, 10));
+    if (day < first || day > last) continue;
+    if (ATT_UNPAID.includes(a.s)) absent.add(day);
+  }
 
-  // Approved unpaid leaves
+  // Explicitly unpaid requests also deduct pay, without counting a date twice.
   const { rows: lv } = await db.query(
     `SELECT to_char(${LEAVE.from},'YYYY-MM-DD') AS f, to_char(${LEAVE.to},'YYYY-MM-DD') AS t,
             ${LEAVE.type}::text AS type
@@ -60,7 +66,9 @@ async function calcPayDays(employeeId, month, year, db) {
     if (!LEAVE_UNPAID_TYPE.test(l.type || '')) continue;
     const from = l.f < startStr ? 1 : Number(l.f.slice(8, 10));
     const to = l.t > endStr ? monthDays : Number(l.t.slice(8, 10));
-    for (let d = from; d <= to; d++) absent.add(d);
+    for (let d = Math.max(from, first); d <= Math.min(to, last); d++) {
+      absent.add(d);
+    }
   }
 
   let absentInRange = 0;
@@ -69,6 +77,7 @@ async function calcPayDays(employeeId, month, year, db) {
   return {
     monthDays,
     employedDays,
+    unpaidLeaveDays: absentInRange,
     netPaidDays: Math.max(0, employedDays - absentInRange),
     joining_date,
     resignation_date,

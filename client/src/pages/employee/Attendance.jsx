@@ -34,11 +34,12 @@ const fmtDate = (v) =>
 const monthKey = (v) =>
   v ? String(v).slice(0, 7) : '';
 
-const statusLabel = (status) => {
+const statusLabel = (status, dayType) => {
   const value = String(status || '').toLowerCase();
 
-  if (value === 'present') return 'Present';
-  if (value === 'absent') return 'Absent';
+  if (value === 'present') return dayType === 'half' ? 'Half Day' : 'Full Day';
+  if (value === 'paid_leave') return 'Paid Leave';
+  if (value === 'absent') return 'Unpaid Leave';
   if (value === 'leave') return 'On Leave';
 
   return status || 'Unknown';
@@ -49,7 +50,7 @@ const statusClass = (status) => {
 
   if (value === 'present') return 'present';
   if (value === 'absent') return 'absent';
-  if (value === 'leave') return 'leave';
+  if (value === 'leave' || value === 'paid_leave') return 'leave';
 
   return 'unknown';
 };
@@ -59,7 +60,7 @@ const getStatusIcon = (status) => {
 
   if (value === 'present') return FiCheckCircle;
   if (value === 'absent') return FiXCircle;
-  if (value === 'leave') return FiCalendar;
+  if (value === 'leave' || value === 'paid_leave') return FiCalendar;
 
   return FiActivity;
 };
@@ -174,8 +175,7 @@ export default function Attendance() {
 
   const leaveCount = rows.filter(
     (a) =>
-      String(a.status || '').toLowerCase() ===
-      'leave'
+      ['leave', 'paid_leave'].includes(String(a.status || '').toLowerCase())
   ).length;
 
   const attendancePercentage =
@@ -1133,7 +1133,7 @@ export default function Attendance() {
 
           <div>
             <div className="attendance-summary-label">
-              Absent
+              Unpaid Leave
             </div>
 
             <div className="attendance-summary-value">
@@ -1141,7 +1141,7 @@ export default function Attendance() {
             </div>
 
             <div className="attendance-summary-sub">
-              Recorded absent days
+              Recorded unpaid leave days
             </div>
           </div>
         </div>
@@ -1381,7 +1381,7 @@ export default function Attendance() {
                           >
                             <StatusIcon />
                             {statusLabel(
-                              a.status
+                              a.status, a.day_type
                             )}
                           </span>
                         </td>
@@ -1457,7 +1457,7 @@ export default function Attendance() {
                       >
                         <StatusIcon />
                         {statusLabel(
-                          a.status
+                          a.status, a.day_type
                         )}
                       </span>
                     </div>

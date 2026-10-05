@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import api, { downloadPayslip } from '../../api';
+import { scheduledLoanDeductions, loanDeductionItems } from '../../utils/payrollDeductions';
 import {
   FiCalendar,
+  FiClipboard,
   FiCheckCircle,
   FiClock,
   FiDownload,
@@ -13,7 +16,6 @@ import {
   FiXCircle,
 } from 'react-icons/fi';
 
-import { FaRupeeSign } from 'react-icons/fa';
 
 const MONTHS = [
   'January',
@@ -42,8 +44,15 @@ const money = (value) =>
 const num = (value) => Number(value) || 0;
 
 export default function Payroll() {
+  const [params] = useSearchParams();
+  const [advances, setAdvances] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [payslips, setPayslips] = useState([]);
+  const [payslipFilters, setPayslipFilters] = useState({ employee_id: '', month: '', year: '' });
+  useEffect(() => {
+    const id = params.get('payslip');
+    if (id && payslips.length) document.getElementById(`payslip-${id}`)?.scrollIntoView({ block: 'center' });
+  }, [params, payslips]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -66,7 +75,8 @@ export default function Payroll() {
   // =========================================================
 
   const loadEmployees = async () => {
-    const response = await api.get('/employees');
+    const [response, advanceResponse] = await Promise.all([api.get('/employees'), api.get('/loans')]);
+    setAdvances(advanceResponse.data);
 
     const activeEmployees = (
       Array.isArray(response.data)
@@ -143,6 +153,8 @@ export default function Payroll() {
   // =========================================================
   // SELECTED EMPLOYEE
   // =========================================================
+
+  const allEmployeesSelected = form.employee_id === 'all';
 
   const selectedEmployee = useMemo(
     () =>
@@ -246,12 +258,18 @@ export default function Payroll() {
     ).slice(0, 10);
     const joiningYear = Number(joiningDate.slice(0, 4));
     const joiningMonth = Number(joiningDate.slice(5, 7));
-    const advanceForMonth =
+    const legacyAdvance =
       joiningDate &&
       Number(form.month) === joiningMonth &&
       Number(form.year) === joiningYear
         ? salary.advance
         : 0;
+    const period = `${form.year}-${String(form.month).padStart(2, '0')}`;
+    const existing = payslips.find((p) => String(p.employee_id) === String(form.employee_id)
+      && Number(p.month) === Number(form.month) && Number(p.year) === Number(form.year));
+    const loanDeductions = scheduledLoanDeductions(advances, form.employee_id, period, existing);
+    const managedRecovery = loanDeductions.reduce((total, entry) => total + entry.amount, 0);
+    const advanceForMonth = legacyAdvance + managedRecovery;
 
     const gross =
       salary.basic +
@@ -272,10 +290,12 @@ export default function Payroll() {
     return {
       gross,
       advance: advanceForMonth,
+      loanDeductions,
+      legacyAdvance,
       totalDeductions,
       netPay,
     };
-  }, [salary, form.allowances, form.month, form.year, selectedEmployee]);
+  }, [salary, form.allowances, form.month, form.year, form.employee_id, selectedEmployee, advances, payslips]);
 
   // =========================================================
   // CHANGE
@@ -290,6 +310,7 @@ export default function Payroll() {
       setForm((prev) => ({
         ...prev,
         employee_id: value,
+        ...(value === 'all' ? { allowances: 0 } : {}),
       }));
 
       return;
@@ -318,12 +339,11 @@ export default function Payroll() {
     setError('');
     setMessage('');
 
-    if (
-      mode === 'update' &&
-      !form.employee_id
-    ) {
+    if (!form.employee_id || (mode === 'update' && allEmployeesSelected)) {
       setError(
-        'Please select an employee to update.'
+        mode === 'update'
+          ? 'Please select an employee to update.'
+          : 'Please select an employee or All employees.'
       );
       return;
     }
@@ -337,6 +357,7 @@ export default function Payroll() {
 
     if (
       form.employee_id &&
+      !allEmployeesSelected &&
       !selectedEmployee
     ) {
       setError('Employee details not found.');
@@ -345,6 +366,7 @@ export default function Payroll() {
 
     if (
       form.employee_id &&
+      !allEmployeesSelected &&
       num(selectedEmployee.basic) <= 0
     ) {
       setError(
@@ -359,9 +381,7 @@ export default function Payroll() {
       const response = await api.post(
         '/payslips/generate',
         {
-          employee_id: form.employee_id
-            ? Number(form.employee_id)
-            : null,
+          employee_id: allEmployeesSelected ? null : Number(form.employee_id),
           month: Number(form.month),
           year: Number(form.year),
           mode,
@@ -423,6 +443,28 @@ export default function Payroll() {
       ),
     [payslips]
   );
+
+  const payslipYears = useMemo(
+    () => [...new Set(payslips.map((payslip) => Number(payslip.year)))].sort((a, b) => b - a),
+    [payslips]
+  );
+
+  const payslipEmployees = useMemo(
+    () => [...new Map(payslips.map((payslip) => [String(payslip.employee_id), {
+      id: String(payslip.employee_id),
+      name: payslip.name || 'Employee',
+      emp_code: payslip.emp_code,
+    }])).values()].sort((a, b) => a.name.localeCompare(b.name)),
+    [payslips]
+  );
+
+  const filteredPayslips = useMemo(() => {
+    return sortedPayslips.filter((payslip) =>
+      (!payslipFilters.employee_id || String(payslip.employee_id) === payslipFilters.employee_id) &&
+      (!payslipFilters.month || Number(payslip.month) === Number(payslipFilters.month)) &&
+      (!payslipFilters.year || Number(payslip.year) === Number(payslipFilters.year))
+    );
+  }, [sortedPayslips, payslipFilters]);
 
   const totalNetPay = payslips.reduce(
     (sum, payslip) =>
@@ -870,6 +912,28 @@ export default function Payroll() {
           overflow-x: auto;
         }
 
+        .payroll-payslip-filters {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: flex-end;
+          gap: 16px;
+          padding: 18px 20px;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .payroll-payslip-filters label {
+          display: grid;
+          gap: 8px;
+          flex: 1 1 180px;
+          min-width: 0;
+          font-weight: 600;
+        }
+
+        .payroll-payslip-filters :is(input, select) {
+          width: 100%;
+          min-width: 0;
+        }
+
         table {
           width: 100%;
           min-width: 850px;
@@ -1000,7 +1064,7 @@ export default function Payroll() {
       <div className="payroll-header">
         <div className="payroll-header-left">
           <div className="header-icon">
-            <FaRupeeSign />
+            <FiClipboard />
           </div>
 
           <div>
@@ -1058,7 +1122,7 @@ export default function Payroll() {
 
         <div className="summary-card">
           <div className="summary-icon">
-            <FaRupeeSign />
+            <FiClipboard />
           </div>
           <div className="summary-label">
             Total Net Pay
@@ -1125,6 +1189,7 @@ export default function Payroll() {
                   <option value="">
                     Select employee
                   </option>
+                  <option value="all">All employees</option>
 
                   {employees.map(
                     (employee) => (
@@ -1188,6 +1253,14 @@ export default function Payroll() {
                 />
               </div>
 
+              {allEmployeesSelected ? (
+                <div className="source-note">
+                  Generate payroll for all eligible active employees for the selected month and year.
+                  Each employee's salary structure and scheduled loan deductions will be used.
+                  Existing payslips and employees without a basic salary are skipped.
+                </div>
+              ) : (
+                <>
               <div className="section-title">
                 Employee Salary Structure
               </div>
@@ -1254,6 +1327,8 @@ export default function Payroll() {
                   </strong>
                 </div>
               </div>
+                </>
+              )}
             </div>
 
             <div className="form-actions">
@@ -1271,9 +1346,9 @@ export default function Payroll() {
                 ) : (
                   <>
                     <FiFileText />
-                    {form.employee_id
-                      ? 'Generate Payslip'
-                      : 'Generate Payslips'}
+                    {allEmployeesSelected
+                      ? 'Generate Payroll for All Employees'
+                      : 'Generate Payslip'}
                   </>
                 )}
               </button>
@@ -1302,7 +1377,7 @@ export default function Payroll() {
         <div className="card">
           <div className="card-header">
             <div className="card-header-icon">
-              <FaRupeeSign />
+              <FiClipboard />
             </div>
 
             <div>
@@ -1317,8 +1392,9 @@ export default function Payroll() {
           <div className="preview-body">
             {!selectedEmployee ? (
               <div className="empty">
-                Select an employee to view
-                payroll details.
+                {allEmployeesSelected
+                  ? `Payroll will be generated for all eligible active employees for ${MONTHS[Number(form.month) - 1]} ${form.year}. Select an individual employee to preview their payroll details.`
+                  : 'Select an employee to view payroll details.'}
               </div>
             ) : (
               <>
@@ -1438,11 +1514,17 @@ export default function Payroll() {
                     </strong>
                   </div>
 
-                  {calculation.advance > 0 && (
+                  {calculation.loanDeductions.map((entry) => (
+                    <div className="calc-row deduction" key={entry.advance_id}>
+                      <Link to={`/admin/loans?loan=${entry.advance_id}`}>Loan LOAN-{entry.advance_id} (incl. interest)</Link>
+                      <strong>-{money(entry.amount)}</strong>
+                    </div>
+                  ))}
+                  {calculation.legacyAdvance > 0 && (
                     <div className="calc-row deduction">
-                      <span>Advance</span>
+                      <span>Salary advance</span>
                       <strong>
-                        -{money(calculation.advance)}
+                        -{money(calculation.legacyAdvance)}
                       </strong>
                     </div>
                   )}
@@ -1499,8 +1581,56 @@ export default function Payroll() {
           </div>
 
           <strong>
-            {payslips.length}
+            {filteredPayslips.length} / {payslips.length}
           </strong>
+        </div>
+
+        <div className="payroll-payslip-filters" role="group" aria-label="Filter generated payslips">
+          <label htmlFor="payslip-employee-filter">
+            Employee
+            <select
+              id="payslip-employee-filter"
+              value={payslipFilters.employee_id}
+              onChange={(event) => setPayslipFilters((current) => ({ ...current, employee_id: event.target.value }))}
+            >
+              <option value="">All employees</option>
+              {payslipEmployees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.emp_code ? `${employee.emp_code} - ` : ''}{employee.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label htmlFor="payslip-month-filter">
+            Month
+            <select
+              id="payslip-month-filter"
+              value={payslipFilters.month}
+              onChange={(event) => setPayslipFilters((current) => ({ ...current, month: event.target.value }))}
+            >
+              <option value="">All months</option>
+              {MONTHS.map((month, index) => <option key={month} value={index + 1}>{month}</option>)}
+            </select>
+          </label>
+          <label htmlFor="payslip-year-filter">
+            Year
+            <select
+              id="payslip-year-filter"
+              value={payslipFilters.year}
+              onChange={(event) => setPayslipFilters((current) => ({ ...current, year: event.target.value }))}
+            >
+              <option value="">All years</option>
+              {payslipYears.map((year) => <option key={year} value={year}>{year}</option>)}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="download-btn"
+            disabled={!payslipFilters.employee_id && !payslipFilters.month && !payslipFilters.year}
+            onClick={() => setPayslipFilters({ employee_id: '', month: '', year: '' })}
+          >
+            Clear filters
+          </button>
         </div>
 
         {downloadError && (
@@ -1513,9 +1643,9 @@ export default function Payroll() {
           <div className="empty">
             Loading payslips...
           </div>
-        ) : sortedPayslips.length === 0 ? (
-          <div className="empty">
-            No payslips generated yet.
+        ) : filteredPayslips.length === 0 ? (
+          <div className="empty" role="status">
+            {payslips.length === 0 ? 'No payslips generated yet.' : 'No payslips match the selected filters.'}
           </div>
         ) : (
           <div className="table-wrap">
@@ -1527,15 +1657,16 @@ export default function Payroll() {
                   <th>Basic</th>
                   <th>EPF</th>
                   <th>Professional Tax</th>
+                  <th>Loan deductions (incl. interest)</th>
                   <th>Net Pay</th>
                   <th>PDF</th>
                 </tr>
               </thead>
 
               <tbody>
-                {sortedPayslips.map(
+                {filteredPayslips.map(
                   (payslip) => (
-                    <tr key={payslip.id}>
+                    <tr key={payslip.id} id={`payslip-${payslip.id}`} style={params.get('payslip') === String(payslip.id) ? { background: 'var(--primary-l)' } : undefined}>
                       <td>
                         <strong>
                           {payslip.name ||
@@ -1575,6 +1706,10 @@ export default function Payroll() {
                         )}
                       </td>
 
+                      <td>
+                        {money(payslip.advance)}
+                        {loanDeductionItems(payslip).map((entry) => <div key={entry.id}>{entry.id === 'advance' ? entry.label : <Link to={`/admin/loans?loan=${entry.id}`}>{entry.label}</Link>} · {money(entry.amount)}</div>)}
+                      </td>
                       <td>
                         <span className="net-pay">
                           {money(

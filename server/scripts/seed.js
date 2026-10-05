@@ -1,18 +1,18 @@
-require('dotenv').config();
+require('../src/config/env');
 const bcrypt = require('bcrypt');
 const pool = require('../src/config/db');
 
-async function seedUser({ name, email, password, role, designation }) {
+async function seedUser({ empCode, name, email, password, role, designation }) {
   if (!email || !password) {
     console.warn(`Skipped ${role}: email or password missing in .env`);
     return;
   }
   const hash = await bcrypt.hash(password, 10);
   await pool.query(
-    `INSERT INTO employees (name, email, password_hash, role, designation)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO employees (emp_code, name, email, password_hash, role, designation)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (email) DO NOTHING`,
-    [name, email, hash, role, designation]
+    [empCode, name, email, hash, role, designation]
   );
   console.log(`${role} ready:`, email);
 }
@@ -25,6 +25,7 @@ async function seedUser({ name, email, password, role, designation }) {
     } = process.env;
 
     await seedUser({
+      empCode: process.env.ADMIN_EMP_CODE || 'ADMIN-001',
       name: ADMIN_NAME || 'Admin',
       email: ADMIN_EMAIL,
       password: ADMIN_PASSWORD,
@@ -33,6 +34,7 @@ async function seedUser({ name, email, password, role, designation }) {
     });
 
     await seedUser({
+      empCode: process.env.EMPLOYEE_EMP_CODE || 'EMP-001',
       name: EMPLOYEE_NAME || 'Employee',
       email: EMPLOYEE_EMAIL,
       password: EMPLOYEE_PASSWORD,

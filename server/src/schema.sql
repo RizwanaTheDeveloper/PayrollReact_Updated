@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS attendance (
   work_date DATE NOT NULL DEFAULT CURRENT_DATE,
 
   status VARCHAR(20)
-    CHECK (status IN ('present', 'absent', 'leave')),
+    CHECK (status IN ('present', 'absent', 'leave', 'paid_leave')),
 
   day_type VARCHAR(10)
     NOT NULL DEFAULT 'full'
@@ -214,12 +214,65 @@ CREATE TABLE IF NOT EXISTS leaves (
 -- =========================================================
 -- MIGRATION SAFETY
 -- =========================================================
+CREATE TABLE IF NOT EXISTS advances (
+  id SERIAL PRIMARY KEY,
+  employee_id INT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  instalment NUMERIC(12,2) NOT NULL CHECK (instalment > 0 AND instalment <= amount),
+  first_recovery DATE NOT NULL CHECK (EXTRACT(DAY FROM first_recovery) = 1),
+  reason TEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'approved', 'active', 'paused', 'rejected')),
+  disbursed_on DATE,
+  payment_reference VARCHAR(150),
+  created_by INT REFERENCES employees(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK ((status IN ('active', 'paused')) = (disbursed_on IS NOT NULL)),
+  CHECK (disbursed_on IS NULL OR payment_reference IS NOT NULL)
+);
+
+-- Keep existing advance records and recoveries when upgrading to loans.
+ALTER TABLE advances
+  ADD COLUMN IF NOT EXISTS interest_percentage NUMERIC(5,2) NOT NULL DEFAULT 0
+    CHECK (interest_percentage >= 0 AND interest_percentage <= 100);
+-- NULL preserves the terms of loans created before monthly flat interest.
+ALTER TABLE advances
+  ADD COLUMN IF NOT EXISTS instalment_count INT
+    CHECK (instalment_count BETWEEN 1 AND 360);
+ALTER TABLE advances DROP CONSTRAINT IF EXISTS advances_instalment_check;
+-- PostgreSQL names the original cross-column instalment check advances_check.
+ALTER TABLE advances DROP CONSTRAINT IF EXISTS advances_check;
+ALTER TABLE advances ADD CONSTRAINT advances_instalment_check
+  CHECK (instalment > 0 AND instalment <= amount + ROUND(amount * interest_percentage / 100, 2) * COALESCE(instalment_count, 1));
+
+CREATE TABLE IF NOT EXISTS advance_recoveries (
+  id SERIAL PRIMARY KEY,
+  advance_id INT NOT NULL REFERENCES advances(id) ON DELETE CASCADE,
+  payslip_id INT NOT NULL REFERENCES payslips(id) ON DELETE CASCADE,
+  amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  UNIQUE (advance_id, payslip_id)
+);
+CREATE INDEX IF NOT EXISTS advance_recoveries_advance_idx ON advance_recoveries(advance_id);
+CREATE INDEX IF NOT EXISTS advances_employee_idx ON advances(employee_id);
+
+CREATE TABLE IF NOT EXISTS advance_events (
+  id SERIAL PRIMARY KEY,
+  advance_id INT NOT NULL REFERENCES advances(id) ON DELETE CASCADE,
+  actor_id INT REFERENCES employees(id) ON DELETE SET NULL,
+  action VARCHAR(30) NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 -- If your existing database already exists, the following
 -- statements safely add the new columns.
 -- =========================================================
 
 ALTER TABLE employees
   ADD COLUMN IF NOT EXISTS epf NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE attendance DROP CONSTRAINT IF EXISTS attendance_status_check;
+ALTER TABLE attendance ADD CONSTRAINT attendance_status_check
+  CHECK (status IN ('present', 'absent', 'leave', 'paid_leave'));
 
 ALTER TABLE employees
   ADD COLUMN IF NOT EXISTS professional_tax NUMERIC(12,2) NOT NULL DEFAULT 0;
