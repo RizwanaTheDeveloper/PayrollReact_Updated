@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api, { downloadPayslip } from '../../api';
-import { scheduledLoanDeductions, loanDeductionItems } from '../../utils/payrollDeductions';
+import { loanDeductionItems } from '../../utils/payrollDeductions';
+import MonthNavigation from '../../components/MonthNavigation';
+import PayrollChecklist from '../../components/PayrollChecklist';
+import PayrollWorkflow from '../../components/PayrollWorkflow';
+import './PayrollImprovements.css';
 import {
   FiCalendar,
   FiClipboard,
@@ -32,7 +36,7 @@ const MONTHS = [
   'December',
 ];
 
-const now = new Date();
+const [currentYear, currentMonth] = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }).slice(0, 7).split('-').map(Number);
 
 const money = (value) =>
   new Intl.NumberFormat('en-IN', {
@@ -48,6 +52,10 @@ export default function Payroll() {
   const [advances, setAdvances] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [payslips, setPayslips] = useState([]);
+  const [preview, setPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+  const [revision, setRevision] = useState(0);
   const [payslipFilters, setPayslipFilters] = useState({ employee_id: '', month: '', year: '' });
   useEffect(() => {
     const id = params.get('payslip');
@@ -65,9 +73,10 @@ export default function Payroll() {
 
   const [form, setForm] = useState({
     employee_id: '',
-    month: now.getMonth() + 1,
-    year: now.getFullYear(),
+    month: currentMonth,
+    year: currentYear,
     allowances: 0,
+    deductions: 0,
   });
 
   // =========================================================
@@ -75,7 +84,7 @@ export default function Payroll() {
   // =========================================================
 
   const loadEmployees = async () => {
-    const [response, loanResponse, advanceResponse] = await Promise.all([api.get('/employees'), api.get('/loans'), api.get('/advances')]);
+    const [response, loanResponse, advanceResponse] = await Promise.all([api.get('/employees', { params: { include_inactive: true } }), api.get('/loans'), api.get('/advances')]);
     setAdvances([...loanResponse.data, ...advanceResponse.data]);
 
     const activeEmployees = (
@@ -85,7 +94,7 @@ export default function Payroll() {
     ).filter(
       (employee) =>
         employee.role === 'employee' &&
-        employee.is_active !== false
+        (employee.is_active !== false || employee.resignation_date)
     );
 
     setEmployees(activeEmployees);
@@ -135,6 +144,7 @@ export default function Payroll() {
         loadEmployees(),
         loadPayslips(),
       ]);
+      setRevision((value) => value + 1);
     } catch (err) {
       setError(
         err?.response?.data?.message ||
@@ -206,6 +216,7 @@ export default function Payroll() {
       allowances: existingPayslip
         ? num(existingPayslip.allowances)
         : 0,
+      deductions: existingPayslip ? num(existingPayslip.additional_deductions) : 0,
     }));
   }, [
     selectedEmployee,
@@ -216,86 +227,33 @@ export default function Payroll() {
   // EMPLOYEE SALARY STRUCTURE
   // =========================================================
 
-  const salary = useMemo(() => {
-    if (!selectedEmployee) {
-      return {
-        basic: 0,
-        hra: 0,
-        special_allowance: 0,
-        lta: 0,
-        other_allowances: 0,
-        epf: 0,
-        professional_tax: 0,
-        advance: 0,
-      };
-    }
+  useEffect(() => {
+    setPreview(null); setPreviewError('');
+    if (!form.employee_id || form.employee_id === 'all') { setPreviewLoading(false); return; }
+    const controller = new AbortController();
+    setPreviewLoading(true);
+    const timer = setTimeout(() => {
+      api.post('/payslips/preview', { employee_id: form.employee_id, month: form.month, year: form.year,
+        allowances: form.allowances, deductions: form.deductions }, { signal: controller.signal })
+        .then(({ data }) => { if (!controller.signal.aborted) setPreview(data); })
+        .catch((err) => { if (!controller.signal.aborted) setPreviewError(err.response?.data?.message || 'Unable to calculate payroll preview.'); })
+        .finally(() => { if (!controller.signal.aborted) setPreviewLoading(false); });
+    }, 200);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [form.employee_id, form.month, form.year, form.allowances, form.deductions, revision]);
 
-    return {
-      basic: num(selectedEmployee.basic),
-      hra: num(selectedEmployee.hra),
-      special_allowance: num(
-        selectedEmployee.special_allowance
-      ),
-      lta: num(selectedEmployee.lta),
-      other_allowances: num(
-        selectedEmployee.other_allowances
-      ),
-      epf: num(selectedEmployee.epf),
-      professional_tax: num(
-        selectedEmployee.professional_tax
-      ),
-      advance: num(selectedEmployee.advance),
-    };
-  }, [selectedEmployee]);
-
-  // =========================================================
-  // CALCULATION
-  // =========================================================
-
-  const calculation = useMemo(() => {
-    const joiningDate = String(
-      selectedEmployee?.joining_date || ''
-    ).slice(0, 10);
-    const joiningYear = Number(joiningDate.slice(0, 4));
-    const joiningMonth = Number(joiningDate.slice(5, 7));
-    const legacyAdvance =
-      joiningDate &&
-      Number(form.month) === joiningMonth &&
-      Number(form.year) === joiningYear
-        ? salary.advance
-        : 0;
-    const period = `${form.year}-${String(form.month).padStart(2, '0')}`;
-    const existing = payslips.find((p) => String(p.employee_id) === String(form.employee_id)
-      && Number(p.month) === Number(form.month) && Number(p.year) === Number(form.year));
-    const loanDeductions = scheduledLoanDeductions(advances, form.employee_id, period, existing);
-    const managedRecovery = loanDeductions.reduce((total, entry) => total + entry.amount, 0);
-    const advanceForMonth = legacyAdvance + managedRecovery;
-
-    const gross =
-      salary.basic +
-      salary.hra +
-      salary.special_allowance +
-      salary.lta +
-      salary.other_allowances +
-      num(form.allowances);
-
-    const totalDeductions =
-      salary.epf +
-      salary.professional_tax +
-      advanceForMonth;
-
-    const netPay =
-      gross - totalDeductions;
-
-    return {
-      gross,
-      advance: advanceForMonth,
-      loanDeductions,
-      legacyAdvance,
-      totalDeductions,
-      netPay,
-    };
-  }, [salary, form.allowances, form.month, form.year, form.employee_id, selectedEmployee, advances, payslips]);
+  const displayPreview = existingPayslip?.status === 'finalized' ? {
+    ...existingPayslip,
+    gross: ['basic','hra','special_allowance','lta','other_allowances','allowances'].reduce((sum, key) => sum + num(existingPayslip[key]), 0),
+    total_deductions: ['epf','professional_tax','advance','deductions'].reduce((sum, key) => sum + num(existingPayslip[key]), 0),
+  } : preview;
+  const salary = displayPreview || {};
+  const calculation = {
+    gross: displayPreview?.gross || 0, advance: displayPreview?.advance || 0,
+    loanDeductions: displayPreview?.calculation_snapshot?.recoveries || [],
+    legacyAdvance: displayPreview?.calculation_snapshot?.legacy_advance || 0,
+    totalDeductions: displayPreview?.total_deductions || 0, netPay: displayPreview?.net_pay || 0,
+  };
 
   // =========================================================
   // CHANGE
@@ -310,7 +268,7 @@ export default function Payroll() {
       setForm((prev) => ({
         ...prev,
         employee_id: value,
-        ...(value === 'all' ? { allowances: 0 } : {}),
+        ...(value === 'all' ? { allowances: 0, deductions: 0 } : {}),
       }));
 
       return;
@@ -348,9 +306,9 @@ export default function Payroll() {
       return;
     }
 
-    if (num(form.allowances) < 0) {
+    if (![form.allowances, form.deductions].every((value) => Number.isFinite(Number(value)) && Number(value) >= 0)) {
       setError(
-        'Additional allowance cannot be negative.'
+        'Additional allowance and deductions must be valid non-negative amounts.'
       );
       return;
     }
@@ -367,7 +325,7 @@ export default function Payroll() {
     if (
       form.employee_id &&
       !allEmployeesSelected &&
-      num(selectedEmployee.basic) <= 0
+      preview?.missingSalary
     ) {
       setError(
         'This employee does not have a Basic Salary. Please update the employee salary structure first.'
@@ -387,12 +345,13 @@ export default function Payroll() {
           mode,
 
           // Only monthly adjustments are entered here.
-          allowances: num(form.allowances),
-          deductions: 0,
+          allowances: form.allowances,
+          deductions: form.deductions,
         }
       );
 
       await loadPayslips();
+      setRevision((value) => value + 1);
 
       setMessage(
         response?.data?.message ||
@@ -1095,6 +1054,9 @@ export default function Payroll() {
 
       {/* SUMMARY */}
 
+      <MonthNavigation period={`${form.year}-${String(form.month).padStart(2, '0')}`} onChange={(period) => { const [year, month] = period.split('-').map(Number); setForm((previous) => ({ ...previous, year, month })); }} />
+      <PayrollChecklist month={form.month} year={form.year} revision={revision} />
+
       <div className="summary-grid">
         <div className="summary-card">
           <div className="summary-icon">
@@ -1256,8 +1218,8 @@ export default function Payroll() {
               {allEmployeesSelected ? (
                 <div className="source-note">
                   Generate payroll for all eligible active employees for the selected month and year.
-                  Each employee's salary structure and scheduled loan deductions will be used.
-                  Existing payslips and employees without a basic salary are skipped.
+                  Each employee's effective salary history, employment dates and scheduled loan deductions will be used.
+                  Existing payslips and employees without a basic salary are skipped. New payslips are saved as drafts for review.
                 </div>
               ) : (
                 <>
@@ -1332,11 +1294,12 @@ export default function Payroll() {
             </div>
 
             <div className="form-actions">
+              <label className="payroll-adjustment-field">Additional deductions<input type="number" name="deductions" min="0" step="0.01" value={form.deductions} onChange={handleChange} disabled={saving || existingPayslip?.status === 'finalized'} /></label>
               <button
                 type="submit"
-                value="generate"
+                value={existingPayslip ? "update" : "generate"}
                 className="generate-btn"
-                disabled={saving}
+                disabled={saving || (!allEmployeesSelected && (previewLoading || !preview || !!previewError || preview.missingSalary || preview.net_pay < 0)) || existingPayslip?.status === "finalized"}
               >
                 {saving ? (
                   <>
@@ -1348,7 +1311,7 @@ export default function Payroll() {
                     <FiFileText />
                     {allEmployeesSelected
                       ? 'Generate Payroll for All Employees'
-                      : 'Generate Payslip'}
+                      : existingPayslip?.status === 'finalized' ? 'Payslip locked' : existingPayslip ? 'Update Draft Payslip' : 'Generate Draft Payslip'}
                   </>
                 )}
               </button>
@@ -1383,14 +1346,13 @@ export default function Payroll() {
             <div>
               <h2>Payroll Preview</h2>
               <p>
-                Values fetched from employee
-                record.
+                Calendar-day proration using effective salary history.
               </p>
             </div>
           </div>
 
           <div className="preview-body">
-            {!selectedEmployee ? (
+            {previewLoading ? <p role="status">Calculating payroll...</p> : previewError ? <p role="alert">{previewError}</p> : !selectedEmployee ? (
               <div className="empty">
                 {allEmployeesSelected
                   ? `Payroll will be generated for all eligible active employees for ${MONTHS[Number(form.month) - 1]} ${form.year}. Select an individual employee to preview their payroll details.`
@@ -1421,7 +1383,7 @@ export default function Payroll() {
 
                   <div className="source-badge">
                     <FiCheckCircle />
-                    Employee Master Data
+                    Effective Salary History
                   </div>
                 </div>
 
@@ -1431,12 +1393,14 @@ export default function Payroll() {
                     {MONTHS[
                       Number(form.month) - 1
                     ]}{' '}
-                    {form.year}. Updating will
-                    replace its monthly values.
+                    {form.year}. Status: {existingPayslip.status}. {existingPayslip.status === 'finalized' ? 'Reopen with a correction reason to change this payslip.' : 'Saving changes returns it to draft for review.'}
                   </div>
                 )}
+                {existingPayslip && existingPayslip.additional_deductions == null && num(existingPayslip.deductions) > 0 && <p className="payroll-policy-note">This older payslip stores unpaid leave and other deductions as a combined amount. Verify the additional deduction field before recalculating it.</p>}
 
                 <div className="calc-list">
+                  {displayPreview?.warnings?.map((warning) => <p key={warning} className="payroll-workflow-error" role="status">{warning}</p>)}
+                  {displayPreview?.employed_days != null && <p className="payroll-policy-note">{displayPreview.employed_days} employment days · {displayPreview.net_paid_days} paid days · {displayPreview.month_days} calendar days</p>}
                   <div className="calc-row">
                     <span>Basic</span>
                     <strong>
@@ -1496,6 +1460,9 @@ export default function Payroll() {
                     </strong>
                   </div>
 
+                  <div className="calc-row deduction"><span>Unpaid leave</span><strong>-{money(salary.unpaid_leave_deduction)}</strong></div>
+                  {num(salary.late_login_deduction) > 0 && <><div className="calc-row deduction"><span>Late login (half day)</span><strong>-{money(salary.late_login_deduction)}</strong></div><p className="payroll-policy-note">{salary.late_login_reason}</p></>}
+                  <div className="calc-row deduction"><span>Additional deductions</span><strong>-{money(salary.additional_deductions)}</strong></div>
                   <div className="calc-row deduction">
                     <span>EPF</span>
                     <strong>
@@ -1661,6 +1628,9 @@ export default function Payroll() {
                   <th>Professional Tax</th>
                   <th>Loan deductions (incl. interest)</th>
                   <th>Net Pay</th>
+                  <th>Payroll status</th>
+                  <th>Payment</th>
+                  <th>Review / payment</th>
                   <th>PDF</th>
                 </tr>
               </thead>
@@ -1720,6 +1690,9 @@ export default function Payroll() {
                         </span>
                       </td>
 
+                      <td><span className={`payroll-state payroll-state-${payslip.status}`}>{payslip.status}</span></td>
+                      <td><span className={`payroll-state payroll-state-${payslip.payment_status}`}>{payslip.payment_status}</span></td>
+                      <td><PayrollWorkflow payslip={payslip} onChanged={async () => { await loadPayslips(); setRevision((value) => value + 1); }} /></td>
                       <td>
                         <button
                           type="button"

@@ -3,6 +3,7 @@ const router = require('express').Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { recordEmployeeLogin } = require('../utils/loginAttendance');
 
 router.post('/login', async (req, res) => {
   try {
@@ -60,6 +61,8 @@ router.post('/login', async (req, res) => {
         expiresIn: '8h'
       }
     );
+
+    if (user.role === 'employee') await recordEmployeeLogin(pool, user.id);
 
     return res.json({
       token,

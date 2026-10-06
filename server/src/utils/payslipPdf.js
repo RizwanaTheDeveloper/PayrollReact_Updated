@@ -554,6 +554,8 @@ module.exports = (res, p) => {
   // =======================================================
 
   const employeeDetails = [
+    ['Payroll status', p.status || 'Generated'], ['Payment status', p.payment_status || 'Not recorded'],
+    ['Employment days', p.employed_days ?? '-'], ['Paid days / calendar days', `${p.net_paid_days ?? '-'} / ${p.month_days ?? '-'}`],
     [
       'Employee Name',
       p.name,
@@ -745,6 +747,8 @@ module.exports = (res, p) => {
   const loanRecoveries = Array.isArray(p.advance_recoveries) ? p.advance_recoveries : [];
   const salaryAdvance = Math.round((num(p.advance) - loanRecoveries.reduce((sum, entry) => sum + num(entry.amount), 0)) * 100) / 100;
   const deductions = [
+    ...(num(p.late_login_deduction) > 0
+      ? [['Late login (half day)', p.late_login_deduction]] : []),
     [
       "EPF (Employees' Provident Fund)",
       p.epf,
@@ -757,9 +761,9 @@ module.exports = (res, p) => {
     ...(salaryAdvance > 0
       ? [[loanRecoveries.length ? 'Salary advance' : 'Loan / salary advance', salaryAdvance]]
       : []),
-    ...(num(p.deductions) > 0
-      ? [['Additional deductions', p.deductions]]
-      : []),
+    ...(p.unpaid_leave_deduction == null
+      ? (num(p.deductions) > 0 ? [['Other / unpaid leave deductions', p.deductions]] : [])
+      : [['Unpaid leave', p.unpaid_leave_deduction], ['Additional deductions', p.additional_deductions]].filter(([, value]) => num(value) > 0)),
   ];
 
   const totalEarnings =
@@ -965,6 +969,12 @@ module.exports = (res, p) => {
   );
 
   y += 25 + 14;
+
+  if (num(p.late_login_deduction) > 0) {
+    doc.fillColor('#475569').font('Helvetica').fontSize(8.5)
+      .text(p.late_login_reason, left, y, { width: contentW });
+    y = doc.y + 10;
+  }
 
   // =======================================================
   // 6. NET PAY

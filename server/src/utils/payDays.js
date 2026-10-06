@@ -27,7 +27,7 @@ async function calcPayDays(employeeId, month, year, db) {
   const joining_date = emp[0]?.joining_date || null;
   const resignation_date = emp[0]?.resignation_date || null;
 
-  const none = { monthDays, employedDays: 0, netPaidDays: 0, unpaidLeaveDays: 0, joining_date, resignation_date };
+  const none = { monthDays, employedDays: 0, netPaidDays: 0, unpaidLeaveDays: 0, unpaidDates: [], joining_date, resignation_date };
   let first = 1, last = monthDays;
 
   if (joining_date) {
@@ -78,6 +78,7 @@ async function calcPayDays(employeeId, month, year, db) {
     monthDays,
     employedDays,
     unpaidLeaveDays: absentInRange,
+    unpaidDates: [...absent].filter((day) => day >= first && day <= last).map((day) => `${prefix}${pad(day)}`),
     netPaidDays: Math.max(0, employedDays - absentInRange),
     joining_date,
     resignation_date,

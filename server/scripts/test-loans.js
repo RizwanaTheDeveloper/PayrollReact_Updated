@@ -158,7 +158,7 @@ async function main() {
     assert.equal(multiEmployeeRegister.find((advance) => advance.id === otherRequest.id).employee_id, otherEmployee, 'Register distinguishes selectable employees');
     assert.equal((await request(`/loans/${otherRequest.id}`)).name, 'Other Employee', 'Selecting another request loads its employee details');
     await pool.query('UPDATE employees SET is_active = FALSE WHERE id = $1', [otherEmployee]);
-    await request('/loans', 'POST', payload, 403, otherEmployeeToken);
+    await request('/loans', 'POST', payload, 401, otherEmployeeToken);
     assert.equal(detail.events.length, 5, 'Creation and decisions audited');
     await pool.query('UPDATE employees SET is_active = TRUE WHERE id = $1', [otherEmployee]);
     const rounded = await request('/loans', 'POST', { ...payload, amount: '1.01', interest_percentage: '50', instalment: '1.52' }, 201, otherEmployeeToken);

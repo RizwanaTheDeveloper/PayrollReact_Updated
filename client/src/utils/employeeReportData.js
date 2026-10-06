@@ -6,11 +6,12 @@ const count = (key, label) => ({ key, label, type: 'number' });
 const money = (key, label) => ({ key, label, type: 'money' });
 const text = (key, label) => ({ key, label, type: 'text' });
 const date = (key, label) => ({ key, label, type: 'date' });
+const datetime = (key, label) => ({ key, label, type: 'datetime' });
 
 export const employeeSummaryColumns = [text('emp_code', 'Employee ID'), text('name', 'Name'), text('department', 'Department'),
   count('present', 'Present days'), count('paid_leave', 'Paid leave days'), count('unpaid', 'Unpaid days'),
   count('leave_requests', 'Leave requests'), count('pending_leave_requests', 'Pending leave requests'), count('rejected_leave_requests', 'Rejected leave requests'),
-  money('loan_balance', 'Loan balance'), money('advance_balance', 'Advance balance'), money('net_pay', 'Net pay'), text('payroll_status', 'Payslip status')];
+  money('loan_balance', 'Loan balance'), money('advance_balance', 'Advance balance'), money('net_pay', 'Net pay'), text('payroll_status', 'Payslip status'), text('workflow_status', 'Approval status'), text('payment_status', 'Payment status')];
 
 export function buildEmployeeSummaries(data, period) {
   const reports = buildReports(data || {}, { period });
@@ -60,6 +61,10 @@ export function buildEmployeeSummaries(data, period) {
       pending_days: days?.pending ?? total(requests.filter((row) => row.status === 'pending'), 'period_days'),
       rejected_days: days?.rejected ?? total(requests.filter((row) => row.status === 'rejected'), 'period_days'),
       payslip_count: payroll ? 1 : 0, payroll_status: coverage.get(id)?.status || 'Outside employment period',
+      workflow_status: payroll?.status || 'Not generated', payment_status: payroll?.payment_status || 'Not recorded',
+      paid_on: payroll?.paid_on ?? null, payment_reference: payroll?.payment_reference || '',
+      employed_days: payroll?.employed_days ?? null, net_paid_days: payroll?.net_paid_days ?? null,
+      unpaid_leave_deduction: payroll?.unpaid_leave_deduction ?? null, additional_deductions: payroll?.additional_deductions ?? null,
       basic: payroll?.basic ?? null, hra: payroll?.hra ?? null, special_allowance: payroll?.special_allowance ?? null,
       lta: payroll?.lta ?? null, other_allowances: payroll?.other_allowances ?? null, allowances: payroll?.allowances ?? null,
       gross: payroll?.gross ?? null, net_pay: payroll?.net ?? null,
@@ -88,6 +93,7 @@ export function employeeDetailReports(data, period, employeeId) {
     .map((row) => ({ ...row, reference: `${advance ? 'ADV' : 'LOAN'}-${row.id}`,
       status: ['approved', 'active', 'paused'].includes(row.status) && number(row.outstanding) === 0 ? 'completed' : row.status }));
   return [
+    { id: 'payroll-activity', title: 'Payroll review and payment history', columns: [text('action', 'Action'), text('actor', 'Changed by'), datetime('created_at', 'Date / time'), text('reason', 'Reason / reference')], rows: own(data?.payroll_audit), note: 'Changes to this payroll month, including corrections, reviews, finalization and recorded payments.' },
     { id: 'attendance', title: 'Daily attendance', columns: [date('work_date', 'Date'), text('status_label', 'Status'), text('day_type', 'Day type'),
       text('check_in', 'Check in'), text('check_out', 'Check out'), count('worked_hours', 'Worked hours'), text('note', 'Note')],
       rows: own(data?.attendance).map((row) => ({ ...row, status_label: { present: 'Present', absent: 'Unpaid leave', leave: 'Paid leave', paid_leave: 'Paid leave' }[row.status] || row.status })),
@@ -97,7 +103,7 @@ export function employeeDetailReports(data, period, employeeId) {
       note: 'Requests overlapping this month. Day counts are clipped to the selected month; counts of requests and counts of days are shown separately.' },
     { id: 'loans', title: 'Loans', columns: creditColumns, rows: creditRows(false), note: 'Requests created through the selected month. Balances include recoveries through that month; approval statuses are current.' },
     { id: 'advances', title: 'Salary advances', columns: creditColumns, rows: creditRows(true), note: 'Salary advances have no interest. Pending and rejected requests are excluded from approved balances.' },
-    { id: 'activity', title: 'Advance and loan activity', columns: [text('reference', 'Request'), text('action', 'Action'), text('actor', 'Changed by'), text('created_at', 'Date / time'), text('note', 'Note')],
+    { id: 'activity', title: 'Advance and loan activity', columns: [text('reference', 'Request'), text('action', 'Action'), text('actor', 'Changed by'), datetime('created_at', 'Date / time'), text('note', 'Note')],
       rows: own(data?.audit).map((row) => ({ ...row, reference: `${row.record_type === 'salary_advance' ? 'ADV' : 'LOAN'}-${row.advance_id}` })), note: 'Recorded decisions and changes in the selected month.' }
   ];
 }
@@ -105,6 +111,7 @@ export function employeeDetailReports(data, period, employeeId) {
 export function employeeReportCsv(summary, details, metadata) {
   const summaryColumns = [
     ...employeeSummaryColumns,
+    date('paid_on', 'Payment date'), text('payment_reference', 'Payment reference'), count('employed_days', 'Employment days'), count('net_paid_days', 'Paid days'), money('unpaid_leave_deduction', 'Unpaid leave deduction'), money('additional_deductions', 'Additional deductions'),
     ...[count('attendance_records', 'Attendance records'), count('worked_hours', 'Worked hours'), count('missing_punches', 'Missing punches'), count('invalid_punches', 'Invalid punch pairs'),
       count('approved_leave_requests', 'Approved leave requests'), count('requested_days', 'Requested leave days'), count('approved_days', 'Approved leave days'),
       count('pending_days', 'Pending leave days'), count('rejected_days', 'Rejected leave days'), count('paid_allowance', 'Monthly paid allowance'), count('paid_balance', 'Paid leave balance'),

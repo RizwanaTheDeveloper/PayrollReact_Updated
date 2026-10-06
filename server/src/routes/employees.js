@@ -3,6 +3,9 @@ const bcrypt = require('bcrypt');
 
 const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
+const { amount } = require('../utils/payrollValidation');
+const { baseline, recordChange } = require('../utils/salaryHistory');
+const { LOCK } = require('../utils/loanRecovery');
 const {
   authenticate,
   authorize
@@ -189,7 +192,9 @@ function clean(body) {
       continue;
     }
 
-    const number = Number(body[key]) || 0;
+    let number;
+    try { number = amount(body[key], key); }
+    catch (error) { return { error: error.message }; }
 
 
     if (number < 0) {
@@ -436,7 +441,7 @@ router.get(
 
         FROM employees
 
-        WHERE is_active
+        WHERE ${req.query.include_inactive === 'true' ? 'TRUE' : 'is_active'}
         ${roleFilter}
 
         ORDER BY name
@@ -453,6 +458,31 @@ router.get(
 // =========================================================
 // CREATE EMPLOYEE
 // =========================================================
+
+async function writeEmployee(sql, params, body, actorId, create = false) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(LOCK);
+    const before = create ? null : (await client.query('SELECT * FROM employees WHERE id = $1 FOR UPDATE', [params[params.length - 1]])).rows[0];
+    const result = await client.query(sql, params);
+    if (result.rows[0]) {
+      if (create) await baseline(client, result.rows[0], actorId);
+      else if (before) await recordChange(client, before, result.rows[0], body, actorId);
+      result.rows = (await client.query(`SELECT ${OUT} FROM employees WHERE id = $1`, [result.rows[0].id])).rows;
+    }
+    await client.query('COMMIT');
+    return result;
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
+}
+
+router.get('/:id/salary-history', asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(`SELECT h.*, h.effective_from::text, COALESCE(e.name, 'System') AS changed_by
+    FROM salary_history h LEFT JOIN employees e ON e.id = h.actor_id
+    WHERE h.employee_id = $1 ORDER BY h.effective_from DESC`, [req.params.id]);
+  res.json(rows);
+}));
 
 router.post(
   '/',
@@ -595,7 +625,7 @@ router.post(
 
         const {
           rows
-        } = await pool.query(
+        } = await writeEmployee(
 
           `
           INSERT INTO employees (
@@ -614,7 +644,7 @@ router.post(
           RETURNING ${OUT}
           `,
 
-          params
+          params, body, req.user.id, true
         );
 
 
@@ -623,6 +653,7 @@ router.post(
           .json(rows[0]);
 
       } catch (error) {
+        if (error.status) return res.status(error.status).json({ message: error.message });
 
         if (
           error.code === '23505'
@@ -731,7 +762,7 @@ router.put(
 
         const {
           rows
-        } = await pool.query(
+        } = await writeEmployee(
 
           `
           UPDATE employees
@@ -745,7 +776,7 @@ router.put(
           RETURNING ${OUT}
           `,
 
-          params
+          params, body, req.user.id
         );
 
 
@@ -763,6 +794,7 @@ router.put(
         res.json(rows[0]);
 
       } catch (error) {
+        if (error.status) return res.status(error.status).json({ message: error.message });
 
         if (
           error.code === '23505'

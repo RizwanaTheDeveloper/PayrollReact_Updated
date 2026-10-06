@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
+const pool = require('../config/db');
 
-exports.authenticate = (req, res, next) => {
+exports.authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -19,12 +20,18 @@ exports.authenticate = (req, res, next) => {
 
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
   } catch (error) {
     return res.status(401).json({
       message: 'Invalid token'
     });
   }
+  try {
+    const { rows } = await pool.query('SELECT role, is_active FROM employees WHERE id = $1', [req.user.id]);
+    if (!rows[0]?.is_active || rows[0].role !== req.user.role) {
+      return res.status(401).json({ message: 'Your account access has changed. Please sign in again.' });
+    }
+    next();
+  } catch (error) { next(error); }
 };
 
 exports.authorize = (...roles) => {

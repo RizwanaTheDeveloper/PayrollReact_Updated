@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool = require('../config/db');
+const { LOCK } = require('../utils/loanRecovery');
 const asyncHandler = require('../utils/asyncHandler');
 const { authenticate, authorize } = require('../middleware/auth');
 const { receiveLeaveDocuments } = require('../utils/leaveDocuments');
@@ -122,6 +123,7 @@ router.post(
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      await client.query(LOCK);
       const { rows } = await client.query(
         `INSERT INTO leaves (
           employee_id,
@@ -266,6 +268,7 @@ router.patch(
 
     try {
       await client.query('BEGIN');
+      await client.query(LOCK);
 
       const { rows } = await client.query(
         `UPDATE leaves

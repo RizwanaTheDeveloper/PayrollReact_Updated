@@ -3,6 +3,7 @@ const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { authenticate, authorize } = require('../middleware/auth');
 const { attendanceWithLeavePolicy } = require('../utils/leavePolicy');
+const { LOCK } = require('../utils/loanRecovery');
 
 router.use(authenticate);
 
@@ -53,6 +54,7 @@ router.put('/bulk', authorize('admin'), asyncHandler(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query(LOCK);
     for (const r of records) {
       if (!r.status) {
         await client.query('DELETE FROM attendance WHERE employee_id = $1 AND work_date = $2', [r.employee_id, work_date]);
@@ -99,7 +101,13 @@ router.get('/', authorize('admin'), asyncHandler(async (req, res) => {
 
 // DELETE /api/attendance/:id  (admin)
 router.delete('/:id', authorize('admin'), asyncHandler(async (req, res) => {
-  await pool.query('DELETE FROM attendance WHERE id = $1', [req.params.id]);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN'); await client.query(LOCK);
+    await client.query('DELETE FROM attendance WHERE id = $1', [req.params.id]);
+    await client.query('COMMIT');
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
   res.json({ message: 'Deleted' });
 }));
 

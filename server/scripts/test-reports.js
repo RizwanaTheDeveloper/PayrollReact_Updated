@@ -108,7 +108,7 @@ async function main() {
     assert.equal(report('loan-register').rows[0].outstanding, 9600);
     assert.equal(report('loan-summary').rows[0].recovered, 1200);
     assert.equal(report('loan-audit').rows[0].actor, 'Admin');
-    assert.ok(report('esi').unavailable && report('payment-summary').unavailable);
+    assert.ok(report('esi').unavailable && !report('payment-summary').unavailable);
     const filtered = buildReports(data, { period: '2026-09', department: 'HR', employeeId: String(newJoiner) });
     assert.equal(filtered.find((r) => r.id === 'register').rows.length, 0);
     assert.equal(filtered.find((r) => r.id === 'employee-register').rows.length, 1);
@@ -161,6 +161,42 @@ async function main() {
     assert.equal(mixed.advance_requests, 3); assert.equal(mixed.loan_balance, 9600);
     assert.equal(mixed.approved_advances, 1); assert.equal(mixed.completed_advances, 0);
     console.log('Passed: individual employee summaries, attendance and leave counts, payroll and credit balances, missing records, employment boundaries, employee-only detail rows and full CSV exports.');
+    // The self-report endpoint must scope every source in SQL, even with spoofed query IDs.
+    await pool.query(`INSERT INTO payslips (employee_id,month,year,basic,net_pay)
+      VALUES ($1,9,2026,12345,12345)`, [newJoiner]);
+    await pool.query(`INSERT INTO attendance (employee_id,work_date,status) VALUES ($1,'2026-09-21','present')`, [newJoiner]);
+    await pool.query(`INSERT INTO leaves (employee_id,leave_type,start_date,end_date,reason)
+      VALUES ($1,'casual','2026-09-22','2026-09-22','Private coworker leave')`, [newJoiner]);
+    const privateLoan = (await pool.query(`INSERT INTO advances (employee_id,amount,instalment,first_recovery,reason,created_at)
+      VALUES ($1,1234,1234,'2026-09-01','Private coworker loan','2026-09-01') RETURNING id`, [newJoiner])).rows[0].id;
+    await pool.query(`INSERT INTO advance_events (advance_id,actor_id,action,note,created_at)
+      VALUES ($1,$2,'created','Private coworker activity','2026-09-01')`, [privateLoan, administrator]);
+    await pool.query(`INSERT INTO payroll_events (employee_id,month,year,actor_id,action,reason)
+      VALUES ($1,9,2026,$3,'reviewed','Private coworker payroll'),($2,9,2026,$3,'reviewed','Own payroll review')`, [newJoiner, employee, administrator]);
+    await request('/my?period=2026-09', null, 401);
+    await request('/my?period=2026-09', token, 403);
+    await request('/my?period=2026-13', employeeToken, 400);
+    for (const suffix of ['', `&employee_id=${newJoiner}`, `&employeeId=${newJoiner}&id=${newJoiner}&all=true`]) {
+      const own = await request(`/my?period=2026-09${suffix}`, employeeToken);
+      assert.equal(own.employees.length, 1); assert.equal(own.employees[0].id, employee);
+      for (const key of ['payslips', 'attendance', 'leaves', 'loans', 'audit', 'payroll_audit']) {
+        assert.ok(own[key].length > 0, `${key} includes own records`);
+        assert.ok(own[key].every((row) => row.employee_id === employee), `${key} excludes coworkers at the API boundary`);
+      }
+      assert.ok(!JSON.stringify(own).includes('Private coworker'));
+      const ownSummaries = buildEmployeeSummaries(own, '2026-09');
+      assert.equal(ownSummaries.length, 1);
+      const ownCsv = employeeReportCsv(ownSummaries[0], employeeDetailReports(own, '2026-09', employee), {});
+      assert.ok(!ownCsv.includes('Private coworker'));
+    }
+    const coworkerToken = jwt.sign({ id: newJoiner, role: 'employee' }, secret);
+    const coworker = await request('/my?period=2026-09', coworkerToken);
+    assert.equal(coworker.employees[0].id, newJoiner);
+    assert.ok(coworker.payslips.every((row) => row.employee_id === newJoiner));
+    const emptyOwn = await request('/my?period=2025-01', employeeToken);
+    assert.equal(emptyOwn.employees.length, 1); assert.equal(emptyOwn.payslips.length, 0);
+    await request('?period=2026-09', coworkerToken, 403);
+    console.log('Passed: employee self-reports, every-source ownership, spoofed employee IDs ignored, role restrictions, empty periods and private CSV exports.');
     console.log(`Passed: report access controls, validation, period boundaries, ${reports.filter((r) => !r.unavailable).length} live reports, filters, payroll and attendance totals, leave balances, loan snapshots, headcount, variance, empty states and CSV safety.`);
   } finally {
     if (server) await new Promise((resolve) => server.close(resolve));

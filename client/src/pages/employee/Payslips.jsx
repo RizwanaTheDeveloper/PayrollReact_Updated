@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import api, { downloadPayslip } from '../../api';
 import { loanDeductionItems } from '../../utils/payrollDeductions';
+import MonthNavigation from '../../components/MonthNavigation';
 
 import {
   FiCalendar,
@@ -1249,6 +1250,7 @@ export default function Payslips() {
       </div>
 
       {/* Payslip List */}
+      {period && <MonthNavigation period={period} onChange={setPeriod} />}
       <div className="payslips-card">
         <div className="card-header">
           <div className="card-header-left">
@@ -1386,7 +1388,7 @@ export default function Payslips() {
                               </span>
 
                               <span className="period-label">
-                                Salary statement
+                                {p.status || 'Generated'} · {p.payment_status || 'Not recorded'}
                               </span>
                             </div>
                           </div>
@@ -1402,6 +1404,7 @@ export default function Payslips() {
 
                         <td className="negative">
                           -{money(totalDeductions)}
+                          <details><summary>Deduction breakdown</summary><small style={{ display: 'block' }}>EPF: {money(p.epf)}</small><small style={{ display: 'block' }}>Professional tax: {money(p.professional_tax)}</small>{Number(p.late_login_deduction) > 0 && <small style={{ display: 'block' }}>Late login (half day): {money(p.late_login_deduction)} — {p.late_login_reason}</small>}{p.unpaid_leave_deduction == null ? <small>Other / unpaid leave: {money(p.deductions)}</small> : <><small style={{ display: 'block' }}>Unpaid leave: {money(p.unpaid_leave_deduction)}</small><small style={{ display: 'block' }}>Additional deductions: {money(p.additional_deductions)}</small></>}</details>
                           {loanDeductionItems(p).map((entry) => (
                             <small key={entry.id} style={{ display: 'block' }}>
                               {entry.label}: -{money(entry.amount)}
@@ -1471,7 +1474,7 @@ export default function Payslips() {
                             {getPeriodLabel(p)}
                           </h3>
                           <small>
-                            Salary statement
+                            {p.status || 'Generated'} · {p.payment_status || 'Not recorded'}
                           </small>
                         </div>
                       </div>
@@ -1514,6 +1517,10 @@ export default function Payslips() {
                           </strong>
                         </div>
                       ))}
+                      <div className="mobile-breakdown-item"><span>EPF</span><strong>{money(p.epf)}</strong></div>
+                      <div className="mobile-breakdown-item"><span>Professional tax</span><strong>{money(p.professional_tax)}</strong></div>
+                      {Number(p.late_login_deduction) > 0 && <><div className="mobile-breakdown-item"><span>Late login (half day)</span><strong>{money(p.late_login_deduction)}</strong></div><small>{p.late_login_reason}</small></>}
+                      {p.unpaid_leave_deduction != null && <><div className="mobile-breakdown-item"><span>Unpaid leave</span><strong>{money(p.unpaid_leave_deduction)}</strong></div><div className="mobile-breakdown-item"><span>Additional deductions</span><strong>{money(p.additional_deductions)}</strong></div></>}
                     </div>
 
                     <button

@@ -65,7 +65,7 @@ async function main() {
     await request('/advances', 'POST', payload, 400);
     await request('/advances', 'POST', { ...payload, employee_id: inactive }, 403);
     await request('/advances', 'POST', { ...payload, employee_id: administrator }, 403);
-    await request('/advances', 'POST', payload, 403, inactiveToken);
+    await request('/advances', 'POST', payload, 401, inactiveToken);
     const advance = await request('/advances', 'POST', { ...payload, employee_id: other, status: 'approved',
       record_type: 'loan', interest_percentage: 99, instalment_count: 10 }, 201, employeeToken);
     const get = () => request(`/advances/${advance.id}`);

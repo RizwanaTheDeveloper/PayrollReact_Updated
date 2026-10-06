@@ -64,6 +64,8 @@ const empLinks = [
   ['/employee/payslips', 'My pay', <FiFileText />],
   ['/employee/loans', 'Loans', <FaHandHoldingUsd />],
   ['/employee/advances', 'Advances', <FaRupeeSign />],
+  ['/employee/reports', 'Reports', <FiClipboard />],
+  ['/employee/settings', 'Settings', <FiSettings />],
 ];
 
 
@@ -191,6 +193,8 @@ export default function App() {
         />
         <Route path="loans" element={<EmployeeLoans />} />
         <Route path="advances" element={<AdvancesPage />} />
+        <Route path="reports" element={<EmployeeReports self />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
 
 

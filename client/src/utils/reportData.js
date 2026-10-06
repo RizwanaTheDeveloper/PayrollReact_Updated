@@ -31,7 +31,7 @@ export function buildReports(data, { period, department = '', employeeId = '' })
     const allowances = ['hra', 'special_allowance', 'lta', 'other_allowances', 'allowances'].reduce((s, k) => s + num(p[k]), 0);
     const deductions = num(p.epf) + num(p.professional_tax) + num(p.advance) + num(p.deductions);
     return { ...p, basic: num(p.basic), total_allowances: allowances, gross: num(p.basic) + allowances,
-      total_deductions: deductions, net: num(p.net_pay), payroll_status: 'Generated',
+      total_deductions: deductions, net: num(p.net_pay), payroll_status: p.status || 'Generated',
       salary_advance: Math.max(0, round(num(p.advance) - num(p.loan_recovery))) };
   });
   const attendance = scoped(data.attendance);
@@ -159,7 +159,7 @@ export function buildReports(data, { period, department = '', employeeId = '' })
 
   add('deductions', 'deduction-summary', 'Employee deduction summary', [...identity, cash('epf', 'PF'),
     cash('professional_tax', 'Professional tax'), cash('loan_recovery', 'Loan recovery'), cash('salary_advance', 'Salary advance'),
-    cash('deductions', 'Other / unpaid leave'), cash('total_deductions', 'Total deductions')], payroll, salaryNote);
+    cash('unpaid_leave_deduction', 'Unpaid leave'), cash('additional_deductions', 'Additional deductions'), cash('deductions', 'Other / unpaid leave total'), cash('total_deductions', 'Total deductions')], payroll, salaryNote);
   for (const [id, title, key, label] of [
     ['pf', 'PF deduction report', 'epf', 'Employee PF'], ['pt', 'Professional Tax report', 'professional_tax', 'Professional tax'],
     ['loan-deductions', 'Loan deduction report', 'loan_recovery', 'Loan recovery'],
@@ -191,9 +191,11 @@ export function buildReports(data, { period, department = '', employeeId = '' })
   add('employees', 'exits', 'Employee exits', employeeColumns, employeeRows(exits));
   unavailable('employees', 'onboarding', 'Onboarding status', 'Onboarding completion and document checklists are not recorded yet.');
 
-  unavailable('payments', 'payment-summary', 'Payroll payment summary', 'Salary payment statuses, dates, and bank references are not recorded. A generated payslip does not confirm payment.');
+  const paidPayroll = payroll.filter((row) => row.payment_status === 'paid');
+  add('payments', 'payment-summary', 'Payroll payment summary', [count('paid_count', 'Paid employees'), cash('paid_amount', 'Paid amount'), count('unpaid_count', 'Unpaid / unrecorded'), cash('unpaid_amount', 'Unpaid / unrecorded amount')],
+    [{ paid_count: paidPayroll.length, paid_amount: sum(paidPayroll, 'net'), unpaid_count: payroll.length - paidPayroll.length, unpaid_amount: sum(payroll.filter((row) => row.payment_status !== 'paid'), 'net') }], 'Payment status comes from administrator-recorded transactions. Generated payslips alone do not confirm payment.');
   unavailable('payments', 'payment-batches', 'Payment batch report', 'Payment batches and transaction success or failure are not recorded yet.');
-  unavailable('payments', 'employee-payment', 'Employee payment report', 'Salary payment transactions and references are not recorded yet.');
+  add('payments', 'employee-payment', 'Employee payment report', [...identity, cash('net', 'Net pay'), column('payment_status', 'Payment status'), date('paid_on', 'Paid on'), column('payment_reference', 'Transaction reference')], payroll, 'Recorded salary payments for the selected payroll month. This report does not initiate bank transfers.');
 
   const byEmployee = new Map(payroll.map((p) => [String(p.employee_id), p]));
   const coverage = eligible.map((e) => {
@@ -226,7 +228,7 @@ export function buildReports(data, { period, department = '', employeeId = '' })
   add('analytics', 'department-cost', 'Department salary cost', [column('department', 'Department'), count('employees', 'Employees'), cash('gross', 'Gross payroll'), cash('average', 'Average gross salary')],
     departmentPayroll.map((g) => ({ ...g, average: g.employees ? round(g.gross / g.employees) : 0 })), 'Saved gross earnings only. Employer contributions are not recorded.');
   add('audit', 'loan-audit', 'Advance / loan audit trail', [...identity, column('advance_id', 'Request ID'), column('credit_type', 'Type'), column('action', 'Action'),
-    column('actor', 'Changed by'), column('created_at', 'Date / time'), column('note', 'Note')], audit, 'Recorded advance and loan actions in the selected month.');
+    column('actor', 'Changed by'), column('created_at', 'Date / time', 'datetime'), column('note', 'Note')], audit, 'Recorded advance and loan actions in the selected month.');
   unavailable('audit', 'salary-audit', 'Salary change audit', 'Salary change actors, previous values, and timestamps are not recorded. Payroll variance is available under Payroll.');
   unavailable('audit', 'attendance-audit', 'Attendance correction audit', 'Attendance correction request and approval history are not recorded yet.');
   unavailable('audit', 'payroll-audit', 'Payroll approval / version report', 'Payroll preparation, finance approvals, and version history are not recorded yet.');
@@ -238,6 +240,15 @@ export function formatReportValue(value, type = 'text') {
   if (type === 'money') return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(num(value));
   if (type === 'number') return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(num(value));
   if (type === 'percent') return `${num(value)}%`;
+  if (type === 'datetime') {
+    let timestamp = String(value).trim().replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1');
+    if (/[+-]\d{2}$/.test(timestamp)) timestamp += ':00';
+    if (!/(Z|[+-]\d{2}:?\d{2})$/i.test(timestamp)) timestamp += '+05:30';
+    const instant = new Date(timestamp);
+    if (Number.isNaN(instant.getTime())) return '—';
+    return instant.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
+      .replace(/\b(am|pm)\b/gi, (part) => part.toUpperCase());
+  }
   if (type === 'date') {
     // Preserve date-only values rather than shifting them across timezones.
     const part = String(value).slice(0, 10);
@@ -261,6 +272,6 @@ export function reportCsv(report, metadata) {
     return `"${(/^[=+\-@\t\r]/.test(text) ? "'" : '') + text.replaceAll('"', '""')}"`;
   };
   return [['Report', report.title], ...Object.entries(metadata), ['Notes', report.note], [],
-    report.columns.map((c) => c.label), ...report.rows.map((r) => report.columns.map((c) => r[c.key] ?? ''))]
+    report.columns.map((c) => c.label), ...report.rows.map((r) => report.columns.map((c) => c.type === 'datetime' ? formatReportValue(r[c.key], c.type) : r[c.key] ?? ''))]
     .map((row) => row.map(cell).join(',')).join('\r\n');
 }

@@ -22,9 +22,29 @@ For an existing installation, run `npm.cmd install` and `npm.cmd run db:init` in
 
 ## Individual employee reports
 
+Employees can open **Employee → Reports** to view their own monthly attendance, leave, salary, deductions, loans, advances and payment information, with CSV and Print / Save PDF options. `/api/reports/my` scopes every source query to the employee ID from the signed login token; supplied employee IDs are ignored. Company reports remain administrator-only. **Employee → Settings** shows account information, permitted access and links to personal payroll, attendance and request updates.
+
 Open **Admin → Reports → Employee reports** for a monthly table of employee IDs, names, attendance and leave counts, approved credit balances, and net pay. Open an employee's name or **View report** for their individual page with attendance records, leave requests and rejection reasons, payroll components and deductions, loans, salary advances, and decision activity. The selected month is preserved when moving between reports. Search and department filters, CSV exports, and Print / Save PDF are available.
 
 Reports use existing database records. Attendance and leave counts cover the selected month; loan and advance request counts and repayments run through that month. Decision statuses reflect current records. Missing payslips show no salary amount, and unmarked attendance is excluded from unpaid day counts.
+
+## Payroll review, salary history and payments
+
+For an existing installation, run `npm.cmd run db:init` in `server`, then restart the API. The migration adds salary versions, payroll workflow/payment fields, calculation snapshots and an audit log. Existing payslip amounts are preserved; their initial workflow status is Draft and no salary payment is inferred.
+
+Monthly earnings use calendar days: each salary component is weighted by the employee's employment dates and the salary version effective on each day. Unpaid leave is deducted at that day's salary rate. The existing leave allowance is retained; additional allowances, EPF and professional tax remain fixed monthly amounts rather than being automatically prorated. Unmarked attendance does not automatically reduce salary.
+
+When changing salary components in **Employees**, provide an effective date and a reason. **Salary history** shows dated versions and who entered them. A second version on the same effective date is rejected to preserve history. Opening versions reflect the salary structure available when tracking was enabled; salary changes made before tracking cannot be reconstructed automatically. Verify historical salary versions before regenerating old payroll.
+
+Use the **Monthly payroll checklist** to review missing salary, pending leave, elapsed weekday attendance gaps and missing punches. Attendance gaps use Monday–Friday as an advisory baseline; company holidays and alternative work schedules need review. **Payroll Preview** uses the same calculation as generation, including date proration, salary versions and deductions.
+
+Payroll progresses **Draft → Reviewed → Finalized** from **Manage payroll**. Updates return reviewed payroll to Draft. Finalized payslips reject edits and deletion. Reopening requires a correction reason, and the audit log retains previous and updated values. Finalization checks for changed calculations and unresolved leave. Deductions exceeding 50% of gross earnings require acknowledgement; negative take-home pay is blocked during generation.
+
+Once a payslip is finalized, record the date and transaction reference of a salary payment already made. This records payment status; it does not transfer funds. Reversing a payment record requires a reason before reopening payroll. Payment reports, employee monthly reports and CSV exports include recorded payment details. PDFs include workflow status, employment/paid days and separate unpaid-leave/additional deductions.
+
+Inactive accounts and accounts with changed roles lose API access immediately, even if their JWT has not expired. The client returns expired or revoked sessions to sign-in.
+
+Run `npm.cmd run test:payroll` for isolated payroll checks, alongside `test:loans`, `test:advances`, `test:leaves` and `test:reports`.
 
 ## Salary advances
 

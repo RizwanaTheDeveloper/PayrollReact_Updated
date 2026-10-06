@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 import api from '../api';
 
@@ -40,6 +40,12 @@ export function AuthProvider({ children }) {
 
     return data.user;
   };
+
+  useEffect(() => {
+    const expireSession = () => setUser(null);
+    window.addEventListener('payroll:session-expired', expireSession);
+    return () => window.removeEventListener('payroll:session-expired', expireSession);
+  }, []);
 
   const logout = () => {
     localStorage.clear();

@@ -314,6 +314,67 @@ ALTER TABLE payslips
 ALTER TABLE payslips
   ADD COLUMN IF NOT EXISTS other_allowances NUMERIC(12,2) NOT NULL DEFAULT 0;
 
+-- Effective-dated structures and immutable payroll calculation snapshots.
+CREATE TABLE IF NOT EXISTS salary_history (
+  id SERIAL PRIMARY KEY,
+  employee_id INT NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
+  effective_from DATE NOT NULL,
+  ctc NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (ctc >= 0),
+  basic NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (basic >= 0),
+  hra NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (hra >= 0),
+  special_allowance NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (special_allowance >= 0),
+  lta NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (lta >= 0),
+  other_allowances NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (other_allowances >= 0),
+  epf NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (epf >= 0),
+  professional_tax NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (professional_tax >= 0),
+  actor_id INT REFERENCES employees(id) ON DELETE SET NULL,
+  reason TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (employee_id, effective_from)
+);
+
+INSERT INTO salary_history (employee_id, effective_from, ctc, basic, hra, special_allowance,
+  lta, other_allowances, epf, professional_tax, reason)
+SELECT id, '2000-01-01', ctc, basic, hra, special_allowance, lta, other_allowances,
+  epf, professional_tax, 'Opening structure when salary tracking was enabled'
+FROM employees e WHERE role = 'employee' AND NOT EXISTS (SELECT 1 FROM salary_history h WHERE h.employee_id = e.id);
+
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'draft'
+  CHECK (status IN ('draft', 'reviewed', 'finalized'));
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) NOT NULL DEFAULT 'unpaid'
+  CHECK (payment_status IN ('unpaid', 'paid'));
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS paid_on DATE;
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(150);
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS reviewed_by INT REFERENCES employees(id) ON DELETE SET NULL;
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS finalized_by INT REFERENCES employees(id) ON DELETE SET NULL;
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS finalized_at TIMESTAMPTZ;
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS unpaid_leave_deduction NUMERIC(12,2);
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS additional_deductions NUMERIC(12,2);
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS late_login_deduction NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS late_login_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS late_login_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS month_days INT;
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS employed_days NUMERIC(5,2);
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS net_paid_days NUMERIC(5,2);
+ALTER TABLE payslips ADD COLUMN IF NOT EXISTS calculation_snapshot JSONB;
+
+CREATE TABLE IF NOT EXISTS payroll_events (
+  id SERIAL PRIMARY KEY,
+  payslip_id INT REFERENCES payslips(id) ON DELETE SET NULL,
+  employee_id INT NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
+  month INT NOT NULL,
+  year INT NOT NULL,
+  actor_id INT REFERENCES employees(id) ON DELETE SET NULL,
+  action VARCHAR(30) NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  before_snapshot JSONB,
+  after_snapshot JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS payroll_events_period_idx ON payroll_events(year, month, employee_id);
+
 ALTER TABLE payslips
   ADD COLUMN IF NOT EXISTS epf NUMERIC(12,2) NOT NULL DEFAULT 0;
 

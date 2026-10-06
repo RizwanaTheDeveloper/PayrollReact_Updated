@@ -5,6 +5,8 @@ import api from '../../api';
 import { formatReportValue as format, reportCsv } from '../../utils/reportData';
 import { buildEmployeeSummaries, employeeDetailReports, employeeReportCsv, employeeSummaryColumns } from '../../utils/employeeReportData';
 import './EmployeeReports.css';
+import MonthNavigation from '../../components/MonthNavigation';
+import { useAuth } from '../../context/AuthContext';
 
 const currentPeriod = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }).slice(0, 7);
 const validPeriod = (value) => /^\d{4}-(0[1-9]|1[0-2])$/.test(value || '') && Number(value.slice(0, 4)) >= 2000 && Number(value.slice(0, 4)) <= 2100;
@@ -17,18 +19,20 @@ function Metrics({ title, row, fields, note }) {
   </section>;
 }
 
-function DetailTable({ report }) {
+function DetailTable({ report, self = false }) {
   return <section className="employee-report-section"><h2>{report.title} <span>({report.rows.length})</span></h2>
     {report.rows.length ? <div className="employee-report-table-wrap"><table className="employee-report-table"><thead><tr>{report.columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead>
       <tbody>{report.rows.map((row, index) => <tr key={row.id ?? index}>{report.columns.map((column) => <td key={column.key} className={['money', 'number'].includes(column.type) ? 'employee-report-numeric' : ''}>
-        {column.key === 'reference' && ['loans', 'advances', 'activity'].includes(report.id) ? <Link to={row.reference.startsWith('ADV-') ? `/admin/advances?advance=${row.advance_id ?? row.id}` : `/admin/loans?loan=${row.advance_id ?? row.id}`}>{row.reference}</Link> : format(row[column.key], column.type)}
+        {column.key === 'reference' && ['loans', 'advances', 'activity'].includes(report.id) ? <Link to={row.reference.startsWith('ADV-') ? `/${self ? 'employee' : 'admin'}/advances?advance=${row.advance_id ?? row.id}` : `/${self ? 'employee' : 'admin'}/loans?loan=${row.advance_id ?? row.id}`}>{row.reference}</Link> : format(row[column.key], column.type)}
       </td>)}</tr>)}</tbody></table></div> : <p className="employee-report-note">No records for this selection.</p>}
     <p className="employee-report-note">{report.note}</p>
   </section>;
 }
 
-export default function EmployeeReports() {
-  const { employeeId } = useParams();
+export default function EmployeeReports({ self = false }) {
+  const { user } = useAuth();
+  const { employeeId: requestedEmployeeId } = useParams();
+  const employeeId = self ? String(user?.id || 'self') : requestedEmployeeId;
   const [params, setParams] = useSearchParams();
   const period = validPeriod(params.get('period')) ? params.get('period') : currentPeriod();
   const [data, setData] = useState(null);
@@ -45,12 +49,12 @@ export default function EmployeeReports() {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError('');
-    api.get('/reports', { params: { period }, signal: controller.signal })
+    api.get(self ? '/reports/my' : '/reports', { params: { period }, signal: controller.signal })
       .then(({ data: result }) => { if (!controller.signal.aborted) setData(result); })
       .catch((err) => { if (!controller.signal.aborted) setError(err.response?.data?.message || 'Unable to load employee reports. Please try again.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [period, revision]);
+  }, [period, revision, self, employeeId]);
   useEffect(() => { setPage(1); }, [query, department, period]);
   const summaries = useMemo(() => buildEmployeeSummaries(data, period), [data, period]);
   const selected = employeeId ? summaries.find((row) => String(row.employee_id) === employeeId) : null;
@@ -82,11 +86,16 @@ export default function EmployeeReports() {
     </td>)}<td className="employee-report-controls"><Link to={`/admin/reports/employees/${row.employee_id}?period=${period}`}>View report</Link></td></tr>)}</tbody></table>;
 
   return <div className="reports-page employee-reports-page">
-    <div className="employee-report-heading"><div><Link className="employee-report-back employee-report-controls" to={employeeId ? `/admin/reports/employees?period=${period}` : `/admin/reports?period=${period}`}><FiArrowLeft />{employeeId ? 'All employee reports' : 'Back to Reports'}</Link>
-      <h1>{employeeId ? 'Monthly employee report' : 'Employee reports'}</h1><p>{periodLabel} · {employeeId ? 'Attendance, leave, salary, loans and advances for one employee.' : 'Select an employee to open their complete monthly report.'}</p></div>
-      <div className="employee-report-actions employee-report-controls"><button type="button" disabled={loading} onClick={() => setRevision((value) => value + 1)}><FiRefreshCw />Refresh</button><button type="button" disabled={!canExport} onClick={download}><FiDownload />Download CSV</button><button type="button" disabled={!canExport} onClick={() => window.print()}><FiPrinter />Print / Save PDF</button></div>
+    <div className="employee-report-heading"><div>{!self && <Link className="employee-report-back employee-report-controls" to={employeeId ? `/admin/reports/employees?period=${period}` : `/admin/reports?period=${period}`}><FiArrowLeft />{employeeId ? 'All employee reports' : 'Back to Reports'}</Link>}
+      <h1>{self ? 'My monthly report' : employeeId ? 'Monthly employee report' : 'Employee reports'}</h1><p>{periodLabel} · {self ? 'Your attendance, leave, salary, loans and advances for the selected month.' : employeeId ? 'Attendance, leave, salary, loans and advances for one employee.' : 'Select an employee to open their complete monthly report.'}</p></div>
+      <div className="employee-report-actions employee-report-controls">
+        <button className={`employee-report-action employee-report-action-refresh ${loading ? 'is-loading' : ''}`} type="button" disabled={loading} aria-busy={loading} onClick={() => setRevision((value) => value + 1)}><FiRefreshCw aria-hidden="true" /><span>{loading ? 'Refreshing...' : 'Refresh'}</span></button>
+        <button className="employee-report-action employee-report-action-download" type="button" disabled={!canExport} onClick={download}><FiDownload aria-hidden="true" /><span>Download CSV</span></button>
+        <button className="employee-report-action employee-report-action-print" type="button" disabled={!canExport} onClick={() => window.print()}><FiPrinter aria-hidden="true" /><span>Print / Save PDF</span></button>
+      </div>
     </div>
     <div className="employee-report-filters employee-report-controls"><label>Report month<input type="month" min="2000-01" max="2100-12" value={period} onChange={(event) => { if (validPeriod(event.target.value)) { const next = new URLSearchParams(params); next.set('period', event.target.value); setParams(next); } }} /></label>
+      <MonthNavigation period={period} onChange={(value) => { const next = new URLSearchParams(params); next.set('period', value); setParams(next); }} />
       {!employeeId && <><label>Department<select value={department} onChange={(event) => setDepartment(event.target.value)}><option value="">All departments</option>{departments.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
         <label>Find employee<input type="search" value={query} placeholder="Employee ID or name" onChange={(event) => setQuery(event.target.value)} /></label></>}
     </div>
@@ -108,16 +117,16 @@ export default function EmployeeReports() {
         ['requested_days', 'Requested days'], ['approved_days', 'Approved days'], ['pending_days', 'Pending days'], ['rejected_days', 'Rejected days'], ['paid_allowance', 'Monthly paid allowance'], ['paid_balance', 'Paid days remaining']
       ]} note="Leave requests and days are separate counts. Only days within the selected month are included." />
       <Metrics title="Payroll and deductions" row={selected} fields={[
-        ['payroll_status', 'Payslip status', 'text'], ['payslip_count', 'Payslips generated'], ['basic', 'Basic salary', 'money'], ['hra', 'HRA', 'money'], ['special_allowance', 'Special allowance', 'money'], ['lta', 'LTA', 'money'], ['other_allowances', 'Other allowances', 'money'], ['allowances', 'Additional allowances', 'money'],
-        ['gross', 'Gross salary', 'money'], ['epf', 'EPF', 'money'], ['professional_tax', 'Professional tax', 'money'], ['loan_deduction', 'Loan deduction', 'money'], ['advance_deduction', 'Advance deduction', 'money'], ['other_deductions', 'Other / unpaid leave deductions', 'money'], ['total_deductions', 'Total deductions', 'money'], ['net_pay', 'Take-home pay', 'money']
+        ['payroll_status', 'Payslip status', 'text'], ['workflow_status', 'Approval status', 'text'], ['payment_status', 'Payment status', 'text'], ['paid_on', 'Payment date', 'date'], ['payment_reference', 'Payment reference', 'text'], ['employed_days', 'Employment days'], ['net_paid_days', 'Paid days'], ['payslip_count', 'Payslips generated'], ['basic', 'Basic salary', 'money'], ['hra', 'HRA', 'money'], ['special_allowance', 'Special allowance', 'money'], ['lta', 'LTA', 'money'], ['other_allowances', 'Other allowances', 'money'], ['allowances', 'Additional allowances', 'money'],
+        ['gross', 'Gross salary', 'money'], ['epf', 'EPF', 'money'], ['professional_tax', 'Professional tax', 'money'], ['loan_deduction', 'Loan deduction', 'money'], ['advance_deduction', 'Advance deduction', 'money'], ['unpaid_leave_deduction', 'Unpaid leave deduction', 'money'], ['additional_deductions', 'Additional deductions', 'money'], ['other_deductions', 'Other / unpaid leave total', 'money'], ['total_deductions', 'Total deductions', 'money'], ['net_pay', 'Take-home pay', 'money']
       ]} note="Amounts come from the saved payslip for this month. A missing payslip shows a dash." />
       <Metrics title="Loans and salary advances" row={selected} fields={[
         ['loan_requests', 'Loan requests through month'], ['approved_loans', 'Approved loans, including repaid'], ['pending_loans', 'Pending loans'], ['rejected_loans', 'Rejected loans'], ['completed_loans', 'Fully repaid loans'], ['loan_balance', 'Approved loan balance', 'money'], ['loan_recovered', 'Loans recovered through month', 'money'],
         ['advance_requests', 'Advance requests through month'], ['approved_advances', 'Approved advances, including repaid'], ['pending_advances', 'Pending advances'], ['rejected_advances', 'Rejected advances'], ['completed_advances', 'Fully repaid advances'], ['advance_balance', 'Approved advance balance', 'money'], ['advance_recovered', 'Advances recovered through month', 'money']
       ]} note="Requests created through this month and repayments saved through this month. Decision statuses are current. Pending and rejected requests are excluded from approved balances." />
-      {detailReports.map((report) => <DetailTable key={report.id} report={report} />)}
+      {detailReports.map((report) => <DetailTable key={report.id} report={report} self={self} />)}
       <footer className="employee-report-document-footer"><span>{selected.emp_code || selected.employee_id} · {selected.name} · {periodLabel}</span>{data?.generated_at && <span>Updated {new Date(data.generated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>}</footer>
-    </article> : <div className="employee-report-state"><h2>Employee not found</h2><p>This employee is not available in the reporting records.</p><Link to={`/admin/reports/employees?period=${period}`}>Open employee reports</Link></div> : <section className="employee-report-section"><h2>Employee monthly summaries <span>({filtered.length})</span></h2>
+    </article> : <div className="employee-report-state"><h2>{self ? 'Report unavailable' : 'Employee not found'}</h2><p>{self ? 'Your reporting records are unavailable. Please contact your payroll administrator.' : 'This employee is not available in the reporting records.'}</p>{!self && <Link to={`/admin/reports/employees?period=${period}`}>Open employee reports</Link>}</div> : <section className="employee-report-section"><h2>Employee monthly summaries <span>({filtered.length})</span></h2>
       <Link className="employee-report-back employee-report-controls" to={`/admin/reports?category=employees&period=${period}`}>View employee statistics and registers</Link>
       {filtered.length ? <><div className="employee-report-table-wrap employee-report-screen-table">{renderRows(pageRows)}</div><div className="employee-report-print-table">{renderRows(filtered)}</div>
         <div className="employee-report-pagination employee-report-controls"><span>Page {activePage} of {pages} · {filtered.length} employees</span><button type="button" disabled={activePage === 1} onClick={() => setPage(activePage - 1)}>Previous</button><button type="button" disabled={activePage === pages} onClick={() => setPage(activePage + 1)}>Next</button></div></> : <p className="employee-report-note">No employees match these filters.</p>}

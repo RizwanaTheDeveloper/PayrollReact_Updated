@@ -20,6 +20,14 @@ api.interceptors.request.use((cfg) => {
   return cfg;
 });
 
+api.interceptors.response.use((response) => response, (error) => {
+  if (error.response?.status === 401 && error.config?.url !== '/auth/login' && localStorage.getItem('token')) {
+    localStorage.removeItem('token'); localStorage.removeItem('user');
+    window.dispatchEvent(new Event('payroll:session-expired'));
+  }
+  return Promise.reject(error);
+});
+
 export async function downloadPayslip(id) {
   const res = await api.get(`/payslips/${id}/download`, {
     responseType: 'blob',
@@ -35,4 +43,4 @@ export async function downloadPayslip(id) {
   URL.revokeObjectURL(url);
 }
 
-export default api; 
+export default api;

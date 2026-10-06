@@ -10,7 +10,8 @@
     "test:loans": "node scripts/test-loans.js",
     "test:advances": "node scripts/test-advances.js",
     "test:leaves": "node scripts/test-leaves.js",
-    "test:reports": "node scripts/test-reports.js"
+    "test:reports": "node scripts/test-reports.js",
+    "test:payroll": "node scripts/test-payroll.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

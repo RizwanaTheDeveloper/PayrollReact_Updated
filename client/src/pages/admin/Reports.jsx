@@ -18,6 +18,7 @@ import {
 } from "react-icons/fi";
 import api from "../../api";
 import ReportCategoryDashboard from "../../components/ReportCategoryDashboard";
+import MonthNavigation from '../../components/MonthNavigation';
 import {
   buildReports,
   formatReportValue,
@@ -418,6 +419,7 @@ export default function Reports() {
         </div>
       </div>
       <div className="reports-filters">
+        <MonthNavigation period={period} onChange={(value) => { const next = new URLSearchParams(params); next.set('period', value); setParams(next); }} />
         <label>
           Report month
           <input

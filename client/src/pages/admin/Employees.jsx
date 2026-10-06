@@ -55,6 +55,8 @@ const deductionLabels = {
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const emptyForm = {
+  salary_effective_from: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+  salary_change_reason: '',
   emp_code: '',
   name: '',
   email: '',
@@ -177,11 +179,22 @@ function SectionHeader({ icon, title, description }) {
 }
 
 export default function Employees() {
+  const [salaryHistory, setSalaryHistory] = useState([]);
+  const [salaryHistoryError, setSalaryHistoryError] = useState('');
   const reportPeriod = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }).slice(0, 7);
   const [employees, setEmployees] = useState([]);
   const [form, setForm] = useState(emptyForm);
 
   const [editingId, setEditingId] = useState(null);
+  useEffect(() => {
+    setSalaryHistory([]); setSalaryHistoryError('');
+    if (!editingId) return;
+    const controller = new AbortController();
+    api.get(`/employees/${editingId}/salary-history`, { signal: controller.signal })
+      .then(({ data }) => { if (!controller.signal.aborted) setSalaryHistory(data); })
+      .catch(() => { if (!controller.signal.aborted) setSalaryHistoryError('Unable to load salary history.'); });
+    return () => controller.abort();
+  }, [editingId]);
   const [showForm, setShowForm] = useState(false);
 
   const [search, setSearch] = useState('');
@@ -281,6 +294,8 @@ export default function Employees() {
     setEditingId(employee.id);
 
     setForm({
+      salary_effective_from: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+      salary_change_reason: '',
       emp_code: employee.emp_code || '',
       name: employee.name || '',
       email: employee.email || '',
@@ -510,6 +525,8 @@ export default function Employees() {
 
   const buildPayload = () => {
     const payload = {
+      salary_effective_from: form.salary_effective_from,
+      salary_change_reason: form.salary_change_reason,
       emp_code: form.emp_code.trim(),
       name: form.name.trim(),
       email: form.email.trim(),
@@ -1829,6 +1846,11 @@ export default function Employees() {
               <div style={{ height: 22 }} />
 
               {/* MONTHLY SALARY STRUCTURE */}
+              {editingId && <div className="payroll-salary-history">
+                <div className="employee-form-grid"><div className="employee-field"><label className="employee-label">Salary effective from<input type="date" min="2000-01-01" max="2100-12-31" name="salary_effective_from" value={form.salary_effective_from} onChange={handleChange} className="employee-input" /></label></div><div className="employee-field"><label className="employee-label">Salary change reason<input type="text" maxLength={1000} name="salary_change_reason" value={form.salary_change_reason} onChange={handleChange} className="employee-input" placeholder="Required when salary components change" /></label></div></div>
+                <p className="employee-help">Salary changes create a new dated version. Earlier payroll uses the version effective on each employment day.</p>
+                <details><summary>Salary history ({salaryHistory.length} versions)</summary>{salaryHistoryError ? <p role="alert">{salaryHistoryError}</p> : <div className="employee-table-wrapper"><table><thead><tr><th>Effective from</th><th>Monthly earnings</th><th>Changed by / reason</th></tr></thead><tbody>{salaryHistory.map((version) => <tr key={version.id}><td>{version.effective_from}</td><td>{money(salaryKeys.reduce((sum, key) => sum + Number(version[key] || 0), 0))}</td><td>{version.changed_by}<div>{version.reason}</div></td></tr>)}</tbody></table></div>}</details>
+              </div>}
               <SectionHeader
                 icon={<FaRupeeSign size={18} />}
                 title="Monthly Salary Structure (Earnings)"
