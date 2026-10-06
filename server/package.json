@@ -8,6 +8,7 @@
     "db:init": "node scripts/init-db.js",
     "seed": "node scripts/seed.js",
     "test:loans": "node scripts/test-loans.js",
+    "test:advances": "node scripts/test-advances.js",
     "test:leaves": "node scripts/test-leaves.js",
     "test:reports": "node scripts/test-reports.js"
   },
@@ -17,8 +18,11 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.4.0",
     "pdfkit": "^0.15.0",
     "pg": "^8.12.0"
   },
-  "devDependencies": { "nodemon": "^3.1.4" }
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
 }

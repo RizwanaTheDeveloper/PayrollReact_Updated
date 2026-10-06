@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../api';
+import LeaveDocuments from '../../components/LeaveDocuments';
 
 import {
   FiAlertCircle,
@@ -132,6 +133,8 @@ const getTypeLabel = (type) => {
 export default function Leaves() {
   const [list, setList] = useState([]);
   const [f, setF] = useState(empty);
+  const [medicalDocuments, setMedicalDocuments] = useState([]);
+  const fileInput = useRef(null);
 
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
@@ -242,9 +245,14 @@ export default function Leaves() {
       setErr('');
       setOk('');
 
-      await api.post('/leaves', f);
+      const body = new FormData();
+      Object.entries(f).forEach(([key, value]) => body.append(key, value));
+      medicalDocuments.forEach((file) => body.append('medical_documents', file));
+      await api.post('/leaves', body);
 
       setF(empty);
+      setMedicalDocuments([]);
+      if (fileInput.current) fileInput.current.value = '';
 
       setOk(
         'Leave request submitted successfully.'
@@ -265,8 +273,23 @@ export default function Leaves() {
 
   const cancelForm = () => {
     setF(empty);
+    setMedicalDocuments([]);
+    if (fileInput.current) fileInput.current.value = '';
     setErr('');
     setOk('');
+  };
+
+  const selectMedicalDocuments = (event) => {
+    const files = Array.from(event.target.files || []);
+    const allowed = /\.(pdf|jpe?g|png)$/i;
+    let message = '';
+    if (files.length > 3) message = 'You can attach up to 3 medical documents.';
+    else if (files.some((file) => !allowed.test(file.name))) message = 'Medical documents must be PDF, JPG, or PNG files.';
+    else if (files.some((file) => file.size === 0 || file.size > 5 * 1024 * 1024)) message = 'Each medical document must be nonempty and 5 MB or smaller.';
+    setErr(message);
+    setOk('');
+    setMedicalDocuments(message ? [] : files);
+    if (message) event.target.value = '';
   };
 
   return (
@@ -855,6 +878,14 @@ export default function Leaves() {
           min-width: 180px;
           color: #64748b;
           line-height: 1.45;
+        }
+
+        .leave-rejection-reason {
+          margin-top: 8px;
+          color: #b91c1c;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+          line-height: 1.5;
         }
 
         .leave-status {
@@ -1456,6 +1487,33 @@ export default function Leaves() {
             </div>
           </div>
 
+          <div className="leave-field" style={{ marginTop: 18 }}>
+            <label htmlFor="lv-medical-documents">Medical documents (optional)</label>
+            <input
+              ref={fileInput}
+              id="lv-medical-documents"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              multiple
+              disabled={submitting}
+              onChange={selectMedicalDocuments}
+              aria-describedby="lv-medical-documents-help"
+              style={{ maxWidth: '100%' }}
+            />
+            <span className="leave-help" id="lv-medical-documents-help">
+              Attach up to 3 PDF, JPG, or PNG files, 5 MB each. Your admin can view them with this request.
+            </span>
+            {medicalDocuments.length > 0 && (
+              <div className="leave-help">
+                {medicalDocuments.map((file) => file.name).join(', ')}
+                <button type="button" className="leave-btn secondary" disabled={submitting} onClick={() => {
+                  setMedicalDocuments([]);
+                  if (fileInput.current) fileInput.current.value = '';
+                }}>Remove documents</button>
+              </div>
+            )}
+          </div>
+
           {/* Form Footer */}
           <div className="leave-form-footer">
             <div className="leave-form-info">
@@ -1659,6 +1717,12 @@ export default function Leaves() {
 
                         <td className="leave-reason-cell">
                           {l.reason || '-'}
+                          <LeaveDocuments leave={l} />
+                          {l.status === 'rejected' && l.rejection_reason && (
+                            <div className="leave-rejection-reason">
+                              <strong>Rejection reason: </strong>{l.rejection_reason}
+                            </div>
+                          )}
                         </td>
 
                         <td>
@@ -1769,6 +1833,12 @@ export default function Leaves() {
                         {l.reason || '-'}
                       </p>
                     </div>
+                    {l.status === 'rejected' && l.rejection_reason && (
+                      <div className="leave-rejection-reason">
+                        <strong>Rejection reason: </strong>{l.rejection_reason}
+                      </div>
+                    )}
+                    <LeaveDocuments leave={l} />
                   </div>
                 );
               })}

@@ -753,7 +753,7 @@ module.exports = (res, p) => {
       'Professional Tax',
       p.professional_tax,
     ],
-    ...loanRecoveries.map((entry) => [`Loan LOAN-${entry.advance_id} (incl. interest)`, entry.amount]),
+    ...loanRecoveries.map((entry) => [entry.record_type === 'salary_advance' ? `Salary advance ADV-${entry.advance_id}` : `Loan LOAN-${entry.advance_id} (incl. interest)`, entry.amount]),
     ...(salaryAdvance > 0
       ? [[loanRecoveries.length ? 'Salary advance' : 'Loan / salary advance', salaryAdvance]]
       : []),

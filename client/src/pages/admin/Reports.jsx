@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   FiArrowLeft,
   FiArrowRight,
@@ -17,13 +17,13 @@ import {
   FiShield,
 } from "react-icons/fi";
 import api from "../../api";
+import ReportCategoryDashboard from "../../components/ReportCategoryDashboard";
 import {
   buildReports,
   formatReportValue,
   reportCategories,
   reportCsv,
 } from "../../utils/reportData";
-import "./Reports.css";
 
 const PAGE_SIZE = 25;
 const format = formatReportValue;
@@ -137,13 +137,18 @@ function ReportMetrics({ report }) {
 }
 
 export default function Reports() {
-  const [period, setPeriod] = useState(() => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const [defaultPeriod] = useState(() => {
+    const requested = params.get('period');
+    if (/^\d{4}-(0[1-9]|1[0-2])$/.test(requested || '') && Number(requested.slice(0, 4)) >= 2000 && Number(requested.slice(0, 4)) <= 2100) return requested;
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }).slice(0, 7);
   });
+  const requestedPeriod = params.get('period');
+  const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedPeriod || '') && Number(requestedPeriod.slice(0, 4)) >= 2000 && Number(requestedPeriod.slice(0, 4)) <= 2100 ? requestedPeriod : defaultPeriod;
   const [department, setDepartment] = useState("");
   const [employeeId, setEmployeeId] = useState("");
-  const [category, setCategory] = useState("payroll");
+  const category = reportCategories.some(([id]) => id === params.get('category')) ? params.get('category') : '';
   const [selected, setSelected] = useState("");
   const [search, setSearch] = useState("");
   const [data, setData] = useState(null);
@@ -152,6 +157,18 @@ export default function Reports() {
   const [reload, setReload] = useState(0);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ key: "", ascending: true });
+  function setCategory(id) {
+    const next = new URLSearchParams(params);
+    next.set('period', period);
+    if (id) next.set('category', id);
+    else next.delete('category');
+    setParams(next);
+  }
+  useEffect(() => {
+    setSelected('');
+    setSearch('');
+    setSort({ key: '', ascending: true });
+  }, [category]);
   const detailHeading = useRef(null);
   const [year, month] = period.split("-").map(Number);
   const periodLabel = new Date(year, month - 1, 1).toLocaleDateString("en-IN", {
@@ -185,7 +202,7 @@ export default function Reports() {
     () => buildReports(data || {}, { period, department, employeeId }),
     [data, period, department, employeeId],
   );
-  const report = reports.find((r) => r.id === selected);
+  const report = reports.find((r) => r.id === selected && r.category === category);
   const visibleReports = reports.filter(
     (r) =>
       r.category === category &&
@@ -317,8 +334,8 @@ export default function Reports() {
                         : ""
                     }
                   >
-                    {c.key === "name" && row.payroll_status === "Generated" ? (
-                      <Link to={`/admin/payroll?payslip=${row.id}`}>
+                    {c.key === "name" && (row.employee_id || ['employees', 'payslips'].includes(report.category)) ? (
+                      <Link to={`/admin/reports/employees/${row.employee_id ?? row.id}?period=${period}`}>
                         {format(row[c.key], c.type)}
                       </Link>
                     ) : (
@@ -364,6 +381,9 @@ export default function Reports() {
           <p>Choose a month, then open the report you need.</p>
         </div>
         <div className="reports-actions">
+          <Link className="reports-primary" to={`/admin/reports/employees?period=${period}`}>
+            <FiUsers /> Employee reports
+          </Link>
           <button
             type="button"
             className="reports-secondary"
@@ -406,8 +426,11 @@ export default function Reports() {
             max="2100-12"
             value={period}
             onChange={(e) => {
-              if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value))
-                setPeriod(e.target.value);
+              if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) {
+                const next = new URLSearchParams(params);
+                next.set('period', e.target.value);
+                setParams(next);
+              }
             }}
           />
         </label>
@@ -452,48 +475,11 @@ export default function Reports() {
             Clear filters
           </button>
         )}
+        {employeeId && <Link className="reports-primary" to={`/admin/reports/employees/${employeeId}?period=${period}`}>View individual report</Link>}
       </div>
       <div className="report-workspace">
-        <label className="report-category-select">
-          Report section
-          <select
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value);
-              setSelected("");
-              setSearch("");
-            }}
-          >
-            {reportCategories.map(([id, label]) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <nav className="report-category-nav" aria-label="Report categories">
-          <span className="report-nav-label">Report sections</span>
-          {reportCategories.map(([id, label]) => {
-            const Icon = categoryInfo[id].Icon;
-            return (
-              <button
-                type="button"
-                key={id}
-                aria-pressed={category === id}
-                className={category === id ? "is-active" : ""}
-                onClick={() => {
-                  setCategory(id);
-                  setSelected("");
-                  setSearch("");
-                }}
-              >
-                <Icon />
-                <span>{label}</span>
-              </button>
-            );
-          })}
-        </nav>
         <div className="report-workspace-content">
+          {category && !selected && <button type="button" className="reports-secondary report-back" onClick={() => { setCategory(""); setSearch(""); }}><FiArrowLeft />Back to report categories</button>}
           {loading ? (
             <p className="reports-state" role="status">
               Loading reports…
@@ -509,6 +495,15 @@ export default function Reports() {
                 Try again
               </button>
             </div>
+          ) : !category ? (
+            <ReportCategoryDashboard
+              categories={reportCategories.map(([id, label]) => {
+                const categoryReports = reports.filter((r) => r.category === id);
+                const available = categoryReports.filter((r) => !r.unavailable).length;
+                return { id, label, ...categoryInfo[id], summary: available ? `${available} reports available` : 'Reports awaiting data' };
+              })}
+              onOpen={(id) => { if (id === 'employees') { navigate(`/admin/reports/employees?period=${period}`); return; } setCategory(id); setSelected(""); setSearch(""); }}
+            />
           ) : report ? (
             <>
               <button

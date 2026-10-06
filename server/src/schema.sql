@@ -210,6 +210,20 @@ CREATE TABLE IF NOT EXISTS leaves (
   applied_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE leaves ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+
+CREATE TABLE IF NOT EXISTS leave_documents (
+  id SERIAL PRIMARY KEY,
+  leave_id INT NOT NULL REFERENCES leaves(id) ON DELETE CASCADE,
+  filename VARCHAR(255) NOT NULL,
+  mime_type VARCHAR(50) NOT NULL CHECK (mime_type IN ('application/pdf', 'image/jpeg', 'image/png')),
+  size_bytes INT NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 5242880),
+  content BYTEA NOT NULL CHECK (octet_length(content) = size_bytes),
+  uploaded_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS leave_documents_leave_id_idx ON leave_documents(leave_id);
+
 
 -- =========================================================
 -- MIGRATION SAFETY
@@ -232,6 +246,11 @@ CREATE TABLE IF NOT EXISTS advances (
 );
 
 -- Keep existing advance records and recoveries when upgrading to loans.
+ALTER TABLE advances
+  ADD COLUMN IF NOT EXISTS record_type VARCHAR(20) NOT NULL DEFAULT 'loan'
+    CHECK (record_type IN ('loan', 'salary_advance'));
+CREATE INDEX IF NOT EXISTS advances_record_type_idx ON advances(record_type);
+
 ALTER TABLE advances
   ADD COLUMN IF NOT EXISTS interest_percentage NUMERIC(5,2) NOT NULL DEFAULT 0
     CHECK (interest_percentage >= 0 AND interest_percentage <= 100);

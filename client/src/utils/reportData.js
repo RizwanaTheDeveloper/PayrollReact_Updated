@@ -37,8 +37,10 @@ export function buildReports(data, { period, department = '', employeeId = '' })
   const attendance = scoped(data.attendance);
   const leaves = scoped(data.leaves);
   const loans = scoped(data.loans).map((l) => ({ ...l,
+    credit_type: l.record_type === 'salary_advance' ? 'Salary advance' : 'Loan',
     outstanding: Math.max(0, round(num(l.total_repayable) - num(l.recovered))) }));
-  const audit = scoped(data.audit);
+  const audit = scoped(data.audit).map((entry) => ({ ...entry,
+    credit_type: entry.record_type === 'salary_advance' ? 'Salary advance' : 'Loan' }));
   // Joining/resignation dates describe the selected period; current active flag is shown separately.
   const eligible = employees.filter((e) => (!e.joining_date || e.joining_date < end)
     && (!e.resignation_date || e.resignation_date >= start));
@@ -204,7 +206,7 @@ export function buildReports(data, { period, department = '', employeeId = '' })
   add('payslips', 'payslip-register', 'Employee payslip status', [...identity, column('status', 'Payslip status'), date('generated_at', 'Generated on'), cash('net', 'Net pay')], coverage);
   unavailable('payslips', 'publication', 'Publication / download report', 'Payslip publication and download events are not recorded yet.');
 
-  add('loans', 'loan-register', 'Employee advances / loans', [...identity, column('id', 'Loan ID'), cash('amount', 'Principal'),
+  add('loans', 'loan-register', 'Employee advances / loans', [...identity, column('id', 'Request ID'), column('credit_type', 'Type'), cash('amount', 'Principal'),
     cash('total_repayable', 'Total with interest'), cash('recovered', 'Recovered through period'), cash('outstanding', 'Outstanding'),
     cash('instalment', 'Monthly recovery'), column('status', 'Current status')], loans,
     'Repayments are counted through the selected payroll month. Terms and approval status are current. Outstanding includes interest; pending and rejected requests are listed but excluded from portfolio totals.');
@@ -212,7 +214,7 @@ export function buildReports(data, { period, department = '', employeeId = '' })
   add('loans', 'loan-summary', 'Monthly advances / loans', [cash('issued', 'Principal issued'), cash('recovered', 'Recovered this month'), cash('outstanding', 'Outstanding with interest')],
     [{ issued: sum(portfolio.filter((l) => l.disbursed_on >= start && l.disbursed_on < end), 'amount'),
       recovered: sum(portfolio, 'period_recovered'), outstanding: sum(portfolio, 'outstanding') }],
-  'Issued principal uses recorded disbursement dates. Recovery uses saved payslips. Portfolio outstanding includes approved loans and their interest.');
+  'Issued principal uses recorded disbursement dates. Recovery uses saved payslips. Portfolio outstanding includes approved salary advances and loans with their interest.');
 
   add('analytics', 'payroll-analytics', 'Monthly payroll analytics', [...summaryColumns, cash('average', 'Average gross salary')],
     [{ ...totals, average: payroll.length ? round(totals.gross / payroll.length) : 0 }], salaryNote);
@@ -223,8 +225,8 @@ export function buildReports(data, { period, department = '', employeeId = '' })
     'Uses recorded employment dates; an exit date is the last employed day. Employees without a joining date are included in opening headcount.');
   add('analytics', 'department-cost', 'Department salary cost', [column('department', 'Department'), count('employees', 'Employees'), cash('gross', 'Gross payroll'), cash('average', 'Average gross salary')],
     departmentPayroll.map((g) => ({ ...g, average: g.employees ? round(g.gross / g.employees) : 0 })), 'Saved gross earnings only. Employer contributions are not recorded.');
-  add('audit', 'loan-audit', 'Loan audit trail', [...identity, column('advance_id', 'Loan ID'), column('action', 'Action'),
-    column('actor', 'Changed by'), column('created_at', 'Date / time'), column('note', 'Note')], audit, 'Recorded loan actions in the selected month.');
+  add('audit', 'loan-audit', 'Advance / loan audit trail', [...identity, column('advance_id', 'Request ID'), column('credit_type', 'Type'), column('action', 'Action'),
+    column('actor', 'Changed by'), column('created_at', 'Date / time'), column('note', 'Note')], audit, 'Recorded advance and loan actions in the selected month.');
   unavailable('audit', 'salary-audit', 'Salary change audit', 'Salary change actors, previous values, and timestamps are not recorded. Payroll variance is available under Payroll.');
   unavailable('audit', 'attendance-audit', 'Attendance correction audit', 'Attendance correction request and approval history are not recorded yet.');
   unavailable('audit', 'payroll-audit', 'Payroll approval / version report', 'Payroll preparation, finance approvals, and version history are not recorded yet.');

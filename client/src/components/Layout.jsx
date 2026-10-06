@@ -2,6 +2,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { FiHome, FiLogOut, FiMenu, FiX } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
+import ReportsNavigation from './ReportsNavigation';
 
 function NavIcon({ icon }) {
   if (isValidElement(icon)) return icon;
@@ -17,9 +18,11 @@ export default function Layout({ links = [] }) {
   const menuButton = useRef(null);
   const sidebar = useRef(null);
   const isEmployee = user?.role === 'employee';
+  const isReports = pathname === '/admin/reports' || pathname.startsWith('/admin/reports/');
   const userName = user?.name || 'User';
   const initials = userName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
-  const pageTitle = links.find(([to]) => to === pathname)?.[1] || 'Payroll';
+  const pageTitle = (links.find(([to]) => to === pathname)
+    || [...links].reverse().find(([to]) => pathname.startsWith(`${to}/`)))?.[1] || 'Payroll';
 
   function closeMenu() { setOpen(false); menuButton.current?.focus(); }
   function signOut() { logout(); navigate('/login', { replace: true }); }
@@ -50,7 +53,7 @@ export default function Layout({ links = [] }) {
   }, [open]);
 
   return (
-    <div className={`design-app ${isEmployee ? 'design-employee-app' : ''}`}>
+    <div className={`design-app ${isEmployee ? 'design-employee-app' : ''} ${isReports ? 'design-reports-app' : ''}`}>
       <a className="design-skip-link" href="#workspace-content">Skip to content</a>
       {open && <button className="design-sidebar-overlay" aria-label="Close navigation" onClick={closeMenu} />}
       <aside id="workspace-navigation" ref={sidebar} className={`design-sidebar ${open ? 'is-open' : ''}`} aria-label="Workspace navigation">
@@ -61,6 +64,7 @@ export default function Layout({ links = [] }) {
       </aside>
       <div className="design-app-main">
         <header className="design-topbar"><div className="design-topbar-left"><button ref={menuButton} className="design-open-menu" type="button" aria-label="Open navigation" aria-expanded={open} aria-controls="workspace-navigation" onClick={() => setOpen(!open)}><FiMenu /></button><span className="design-topbar-title">{pageTitle}</span></div><div className="design-topbar-right"><span className="design-topbar-workspace">{isEmployee ? 'My workspace' : 'Payroll workspace'}</span><span className="design-user-avatar" aria-label={userName}>{initials}</span></div></header>
+        {isReports && <ReportsNavigation />}
         <main id="workspace-content" className="design-content" tabIndex={-1}><Outlet /></main>
         {isEmployee && <nav className="design-bottom-navigation" aria-label="Employee shortcuts">{links.map(([to, label, icon], index) => <NavLink key={to} to={to} end={index === 0} className={({ isActive }) => isActive ? 'is-active' : ''}><span aria-hidden="true"><NavIcon icon={icon} /></span><span>{label}</span></NavLink>)}</nav>}
       </div>

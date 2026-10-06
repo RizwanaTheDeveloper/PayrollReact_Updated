@@ -22,7 +22,8 @@ router.get('/', asyncHandler(async (req, res) => {
       designation, is_active, joining_date::text, resignation_date::text
       FROM employees WHERE role = 'employee' ORDER BY name`);
     const payslips = await client.query(`SELECT p.*,
-      COALESCE((SELECT SUM(r.amount) FROM advance_recoveries r WHERE r.payslip_id = p.id), 0) AS loan_recovery
+      COALESCE((SELECT SUM(r.amount) FROM advance_recoveries r JOIN advances a ON a.id = r.advance_id
+        WHERE r.payslip_id = p.id AND a.record_type = 'loan'), 0) AS loan_recovery
       FROM payslips p WHERE make_date(p.year, p.month, 1) >= $1::date - interval '1 month'
         AND make_date(p.year, p.month, 1) < $1::date + interval '1 month'
       ORDER BY p.year, p.month, p.employee_id`, [start]);
@@ -34,12 +35,12 @@ router.get('/', asyncHandler(async (req, res) => {
       FROM policy_attendance WHERE work_date >= $1::date
         AND work_date < $1::date + interval '1 month' ORDER BY work_date, employee_id`, [start]);
     const leaves = await client.query(`SELECT id, employee_id, leave_type, start_date::text,
-      end_date::text, reason, status,
+      end_date::text, reason, status, rejection_reason,
       (LEAST(end_date, ($1::date + interval '1 month' - interval '1 day')::date)
        - GREATEST(start_date, $1::date) + 1) AS period_days
       FROM leaves WHERE start_date < $1::date + interval '1 month' AND end_date >= $1::date
       ORDER BY start_date, employee_id`, [start]);
-    const loans = await client.query(`SELECT a.id, a.employee_id, a.amount, a.instalment,
+    const loans = await client.query(`SELECT a.id, a.employee_id, a.amount, a.instalment, a.record_type,
       a.interest_percentage, a.instalment_count, a.status, a.first_recovery::text,
       a.disbursed_on::text, a.created_at::text,
       a.amount + ROUND(a.amount * a.interest_percentage / 100, 2) * COALESCE(a.instalment_count, 1) AS total_repayable,
@@ -50,7 +51,7 @@ router.get('/', asyncHandler(async (req, res) => {
       LEFT JOIN payslips p ON p.id = r.payslip_id
       WHERE a.created_at < $1::date + interval '1 month'
       GROUP BY a.id ORDER BY a.employee_id, a.id`, [start]);
-    const audit = await client.query(`SELECT v.id, a.employee_id, v.advance_id, v.action, v.note,
+    const audit = await client.query(`SELECT v.id, a.employee_id, a.record_type, v.advance_id, v.action, v.note,
       v.created_at::text, COALESCE(actor.name, 'Deleted user') AS actor
       FROM advance_events v JOIN advances a ON a.id = v.advance_id
       LEFT JOIN employees actor ON actor.id = v.actor_id

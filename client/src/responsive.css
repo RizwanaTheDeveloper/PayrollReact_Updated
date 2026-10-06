@@ -157,7 +157,7 @@ html {
   white-space: nowrap;
 }
 #root .design-bottom-navigation {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 #root .design-bottom-navigation a {
   min-width: 0;

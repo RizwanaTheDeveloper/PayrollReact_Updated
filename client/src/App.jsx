@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import AdvancesPage from './components/AdvancesPage';
 
 import Login from './pages/Login';
 
@@ -13,6 +14,7 @@ import AdminLeaves from './pages/admin/Leaves';
 import AdminAttendance from './pages/admin/Attendance';
 import Loans from './pages/admin/Loans';
 import Reports from './pages/admin/Reports';
+import EmployeeReports from './pages/admin/EmployeeReports';
 import Settings from './pages/admin/Settings';
 
 import EmpDashboard from './pages/employee/Dashboard';
@@ -31,7 +33,7 @@ import {
   FiFileText,
   FiSettings
 } from 'react-icons/fi';
-import { FaRupeeSign } from 'react-icons/fa';
+import { FaHandHoldingUsd, FaRupeeSign } from 'react-icons/fa';
 
 
 /* ---------------------------------------
@@ -44,7 +46,8 @@ const adminLinks = [
   ['/admin/payroll', 'Payroll', <FiClipboard />],
   ['/admin/attendance', 'Attendance', <FiClock />],
   ['/admin/leaves', 'Leave', <FiCalendar />],
-  ['/admin/loans', 'Loans', <FaRupeeSign />],
+  ['/admin/loans', 'Loans', <FaHandHoldingUsd />],
+  ['/admin/advances', 'Advances', <FaRupeeSign />],
   ['/admin/reports', 'Reports', <FiFileText />],
   ['/admin/settings', 'Settings', <FiSettings />],
 ];
@@ -59,7 +62,8 @@ const empLinks = [
   ['/employee/attendance', 'Attendance', <FiClock />],
   ['/employee/leaves', 'Leave', <FiCalendar />],
   ['/employee/payslips', 'My pay', <FiFileText />],
-  ['/employee/loans', 'Loans', <FaRupeeSign />],
+  ['/employee/loans', 'Loans', <FaHandHoldingUsd />],
+  ['/employee/advances', 'Advances', <FaRupeeSign />],
 ];
 
 
@@ -147,8 +151,10 @@ export default function App() {
         />
         <Route path="loans" element={<Loans />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="reports/employees" element={<EmployeeReports />} />
+        <Route path="reports/employees/:employeeId" element={<EmployeeReports />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="advances" element={<Navigate to="../loans" replace />} />
+        <Route path="advances" element={<AdvancesPage admin />} />
       </Route>
 
 
@@ -184,7 +190,7 @@ export default function App() {
           element={<Leaves />}
         />
         <Route path="loans" element={<EmployeeLoans />} />
-        <Route path="advances" element={<Navigate to="../loans" replace />} />
+        <Route path="advances" element={<AdvancesPage />} />
       </Route>
 
 

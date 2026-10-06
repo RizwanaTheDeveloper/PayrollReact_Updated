@@ -75,8 +75,8 @@ export default function Payroll() {
   // =========================================================
 
   const loadEmployees = async () => {
-    const [response, advanceResponse] = await Promise.all([api.get('/employees'), api.get('/loans')]);
-    setAdvances(advanceResponse.data);
+    const [response, loanResponse, advanceResponse] = await Promise.all([api.get('/employees'), api.get('/loans'), api.get('/advances')]);
+    setAdvances([...loanResponse.data, ...advanceResponse.data]);
 
     const activeEmployees = (
       Array.isArray(response.data)
@@ -1516,7 +1516,9 @@ export default function Payroll() {
 
                   {calculation.loanDeductions.map((entry) => (
                     <div className="calc-row deduction" key={entry.advance_id}>
-                      <Link to={`/admin/loans?loan=${entry.advance_id}`}>Loan LOAN-{entry.advance_id} (incl. interest)</Link>
+                      <Link to={entry.record_type === 'salary_advance' ? `/admin/advances?advance=${entry.advance_id}` : `/admin/loans?loan=${entry.advance_id}`}>
+                        {entry.record_type === 'salary_advance' ? `Salary advance ADV-${entry.advance_id}` : `Loan LOAN-${entry.advance_id} (incl. interest)`}
+                      </Link>
                       <strong>-{money(entry.amount)}</strong>
                     </div>
                   ))}
@@ -1708,7 +1710,7 @@ export default function Payroll() {
 
                       <td>
                         {money(payslip.advance)}
-                        {loanDeductionItems(payslip).map((entry) => <div key={entry.id}>{entry.id === 'advance' ? entry.label : <Link to={`/admin/loans?loan=${entry.id}`}>{entry.label}</Link>} · {money(entry.amount)}</div>)}
+                        {loanDeductionItems(payslip).map((entry) => <div key={entry.id}>{entry.id === 'advance' ? entry.label : <Link to={entry.href}>{entry.label}</Link>} · {money(entry.amount)}</div>)}
                       </td>
                       <td>
                         <span className="net-pay">

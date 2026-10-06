@@ -2,6 +2,7 @@ const router = require('express').Router();
 const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { authenticate, authorize } = require('../middleware/auth');
+const { receiveLeaveDocuments } = require('../utils/leaveDocuments');
 
 router.use(authenticate);
 
@@ -17,7 +18,14 @@ const COLS = `
   l.start_date::text AS start_date,
   l.end_date::text AS end_date,
   l.reason,
-  l.status
+  l.status,
+  l.rejection_reason,
+  COALESCE((
+    SELECT json_agg(json_build_object(
+      'id', d.id, 'filename', d.filename, 'mime_type', d.mime_type, 'size_bytes', d.size_bytes
+    ) ORDER BY d.id)
+    FROM leave_documents d WHERE d.leave_id = l.id
+  ), '[]'::json) AS medical_documents
 `;
 
 // GET /api/leaves/my
@@ -46,8 +54,11 @@ router.get(
 //   end_date,
 //   reason
 // }
+// Also accepts multipart/form-data with optional medical_documents files.
 router.post(
   '/',
+  authorize('employee'),
+  receiveLeaveDocuments,
   asyncHandler(async (req, res) => {
     const {
       leave_type,
@@ -79,7 +90,7 @@ router.post(
       });
     }
 
-    if (!reason || !reason.trim()) {
+    if (typeof reason !== 'string' || !reason.trim()) {
       return res.status(400).json({
         message: 'Reason is required'
       });
@@ -108,33 +119,80 @@ router.post(
       });
     }
 
-    const { rows } = await pool.query(
-      `INSERT INTO leaves (
-        employee_id,
-        leave_type,
-        start_date,
-        end_date,
-        reason
-      )
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING
-        id,
-        employee_id,
-        leave_type,
-        start_date::text AS start_date,
-        end_date::text AS end_date,
-        reason,
-        status`,
-      [
-        req.user.id,
-        leave_type,
-        start_date,
-        end_date,
-        reason.trim()
-      ]
-    );
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows } = await client.query(
+        `INSERT INTO leaves (
+          employee_id,
+          leave_type,
+          start_date,
+          end_date,
+          reason
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING
+          id,
+          employee_id,
+          leave_type,
+          start_date::text AS start_date,
+          end_date::text AS end_date,
+          reason,
+          status`,
+        [
+          req.user.id,
+          leave_type,
+          start_date,
+          end_date,
+          reason.trim()
+        ]
+      );
 
-    res.status(201).json(rows[0]);
+      const medicalDocuments = [];
+      for (const file of req.files || []) {
+        const document = await client.query(
+          `INSERT INTO leave_documents (leave_id, filename, mime_type, size_bytes, content)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id, filename, mime_type, size_bytes`,
+          [rows[0].id, file.originalname, file.mimetype, file.size, file.buffer]
+        );
+        medicalDocuments.push(document.rows[0]);
+      }
+      await client.query('COMMIT');
+      res.status(201).json({ ...rows[0], medical_documents: medicalDocuments });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  })
+);
+
+// Document contents are served only to the submitting employee or an admin.
+router.get(
+  '/:id/documents/:documentId',
+  asyncHandler(async (req, res) => {
+    if (![req.params.id, req.params.documentId].every((id) => /^\d+$/.test(id) && Number.isSafeInteger(Number(id)) && Number(id) <= 2147483647)) {
+      return res.status(400).json({ message: 'Invalid leave or document ID' });
+    }
+    const { rows } = await pool.query(
+      `SELECT d.filename, d.mime_type, d.content
+       FROM leave_documents d JOIN leaves l ON l.id = d.leave_id
+       WHERE d.id = $1 AND l.id = $2
+         AND ($3::boolean OR l.employee_id = $4)`,
+      [req.params.documentId, req.params.id, req.user.role === 'admin', req.user.id]
+    );
+    if (!rows[0]) {
+      return res.status(404).json({ message: 'Medical document not found' });
+    }
+    res.attachment(rows[0].filename);
+    res.set({
+      'Content-Type': rows[0].mime_type,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    res.send(rows[0].content);
   })
 );
 
@@ -176,13 +234,14 @@ router.get(
 // Admin: approve or reject a pending leave request
 // Body:
 // {
-//   status: 'approved' | 'rejected'
+//   status: 'approved' | 'rejected',
+//   rejection_reason: required when rejecting
 // }
 router.patch(
   '/:id/status',
   authorize('admin'),
   asyncHandler(async (req, res) => {
-    const { status } = req.body || {};
+    const { status, rejection_reason } = req.body || {};
 
     if (
       !['approved', 'rejected'].includes(status)
@@ -193,6 +252,16 @@ router.patch(
       });
     }
 
+    const rejectionReason = typeof rejection_reason === 'string'
+      ? rejection_reason.trim()
+      : '';
+
+    if (status === 'rejected' && !rejectionReason) {
+      return res.status(400).json({
+        message: 'A rejection reason is required'
+      });
+    }
+
     const client = await pool.connect();
 
     try {
@@ -200,13 +269,14 @@ router.patch(
 
       const { rows } = await client.query(
         `UPDATE leaves
-         SET status = $1
+         SET status = $1, rejection_reason = $3
          WHERE id = $2
            AND status = 'pending'
          RETURNING *`,
         [
           status,
-          req.params.id
+          req.params.id,
+          status === 'rejected' ? rejectionReason : null
         ]
       );
 
@@ -278,7 +348,8 @@ router.patch(
 
       res.json({
         id: leave.id,
-        status: leave.status
+        status: leave.status,
+        rejection_reason: leave.rejection_reason
       });
     } catch (error) {
       await client.query('ROLLBACK');

@@ -346,15 +346,6 @@ function MarkDay() {
 
           <button
             type="button"
-            className="attendance-btn secondary"
-            onClick={() => markAll('')}
-          >
-            <FiX />
-            Clear All
-          </button>
-
-          <button
-            type="button"
             className="attendance-btn refresh"
             onClick={() => load(true)}
             disabled={refreshing || loading}

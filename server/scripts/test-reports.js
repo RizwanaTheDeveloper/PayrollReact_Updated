@@ -121,6 +121,46 @@ async function main() {
       { employee_id: employee, year: 2026, month: 1, basic: 110 },
     ] }, { period: '2026-01' });
     assert.equal(rollover.find((r) => r.id === 'variance').rows[0].change, 10);
+    const { buildEmployeeSummaries, employeeDetailReports, employeeReportCsv } = await import(
+      pathToFileURL(path.resolve(__dirname, '../../client/src/utils/employeeReportData.js')).href);
+    const summaries = buildEmployeeSummaries(data, '2026-09');
+    assert.equal(summaries.length, 4, 'Employee overview includes every employee');
+    const individual = summaries.find((row) => row.employee_id === employee);
+    assert.equal(individual.emp_code, 'TEST-E'); assert.equal(individual.name, 'Employee A');
+    assert.deepEqual([individual.attendance_records, individual.present, individual.paid_leave, individual.unpaid,
+      individual.worked_hours, individual.missing_punches, individual.invalid_punches], [6, 2.5, 2, 1, 9, 1, 1]);
+    assert.deepEqual([individual.leave_requests, individual.approved_leave_requests, individual.pending_leave_requests,
+      individual.rejected_leave_requests], [3, 1, 1, 1], 'Request counts differ from requested day counts');
+    assert.deepEqual([individual.requested_days, individual.approved_days, individual.pending_days, individual.rejected_days], [6, 3, 2, 1]);
+    assert.equal(individual.paid_balance, 0); assert.equal(Number(individual.net_pay), 28300);
+    assert.equal(Number(individual.total_deductions), 4700); assert.equal(individual.loan_balance, 9600);
+    assert.equal(individual.advance_balance, 0); assert.equal(individual.loan_requests, 1);
+    assert.equal(individual.approved_loans, 1); assert.equal(individual.completed_loans, 0);
+    const withoutRecords = summaries.find((row) => row.employee_id === newJoiner);
+    assert.equal(withoutRecords.present, 0); assert.equal(withoutRecords.net_pay, null, 'Missing payroll is not zero pay');
+    assert.equal(withoutRecords.payroll_status, 'Not generated'); assert.equal(withoutRecords.paid_balance, 2);
+    const future = summaries.find((row) => row.name === 'Future');
+    assert.equal(future.payroll_status, 'Outside employment period'); assert.equal(future.paid_allowance, null);
+    const individualDetails = employeeDetailReports(data, '2026-09', employee);
+    assert.equal(individualDetails.find((r) => r.id === 'attendance').rows.length, 6);
+    assert.equal(individualDetails.find((r) => r.id === 'leaves').rows.length, 3);
+    assert.equal(individualDetails.find((r) => r.id === 'loans').rows[0].outstanding, 9600);
+    assert.ok(individualDetails.every((r) => r.rows.every((row) => row.employee_id === employee)), 'No other employee appears in individual details');
+    const individualCsv = employeeReportCsv(individual, individualDetails, { Period: 'September 2026' });
+    assert.match(individualCsv, /Individual employee report/); assert.match(individualCsv, /Daily attendance/);
+    assert.match(individualCsv, /Employee A/); assert.match(individualCsv, /Approved leave requests/);
+    assert.match(employeeReportCsv(withoutRecords, [], {}), /"'=Formula"/, 'Individual CSV neutralizes spreadsheet formulas');
+    assert.deepEqual(buildEmployeeSummaries(null, '2026-09'), []);
+    const mixed = buildEmployeeSummaries({ ...data, loans: [...data.loans,
+      { id: 999, employee_id: employee, record_type: 'salary_advance', amount: '500', total_repayable: '500', recovered: '100', status: 'approved' },
+      { id: 1000, employee_id: employee, record_type: 'salary_advance', amount: '700', total_repayable: '700', recovered: 0, status: 'pending' },
+      { id: 1001, employee_id: employee, record_type: 'salary_advance', amount: '300', total_repayable: '300', recovered: 0, status: 'rejected' }
+    ] }, '2026-09').find((row) => row.employee_id === employee);
+    assert.equal(mixed.advance_balance, 400, 'Pending and rejected advances are excluded from approved balances');
+    assert.equal(mixed.pending_advances, 1); assert.equal(mixed.rejected_advances, 1);
+    assert.equal(mixed.advance_requests, 3); assert.equal(mixed.loan_balance, 9600);
+    assert.equal(mixed.approved_advances, 1); assert.equal(mixed.completed_advances, 0);
+    console.log('Passed: individual employee summaries, attendance and leave counts, payroll and credit balances, missing records, employment boundaries, employee-only detail rows and full CSV exports.');
     console.log(`Passed: report access controls, validation, period boundaries, ${reports.filter((r) => !r.unavailable).length} live reports, filters, payroll and attendance totals, leave balances, loan snapshots, headcount, variance, empty states and CSV safety.`);
   } finally {
     if (server) await new Promise((resolve) => server.close(resolve));

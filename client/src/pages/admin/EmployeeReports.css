@@ -1,0 +1,354 @@
+.employee-reports-page {
+  width: 100%;
+  min-width: 0;
+}
+.employee-report-heading,
+.employee-report-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.employee-report-heading {
+  margin-bottom: 12px;
+}
+.employee-report-heading h1 {
+  margin: 12px 0 8px;
+}
+.employee-report-heading p,
+.employee-report-note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.employee-report-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--primary-d);
+}
+.employee-report-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.employee-report-filters label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 180px;
+}
+.employee-report-filters :is(input, select) {
+  padding: 10px 12px;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  color: var(--text);
+  font: inherit;
+}
+.employee-report-identity,
+.employee-report-section {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 12px;
+  padding: 14px;
+  min-width: 0;
+}
+.employee-report-section h2,
+.employee-report-identity h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.employee-report-section h2 span {
+  color: var(--muted);
+  font-size: 14px;
+}
+.employee-report-metrics,
+.employee-report-identity dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.employee-report-metrics > div {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8faff;
+}
+.employee-report-metrics dt,
+.employee-report-identity dt {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.employee-report-metrics dd,
+.employee-report-identity dd {
+  margin: 4px 0 0;
+  font-weight: 650;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.employee-report-identity dd {
+  font-size: 14px;
+}
+.employee-report-table-wrap {
+  width: 100%;
+  max-height: 480px;
+  overflow: auto;
+}
+.employee-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+.employee-report-table :is(th, td) {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.employee-report-table th {
+  white-space: nowrap;
+  background: #f8faff;
+  color: var(--muted);
+  position: sticky;
+  top: 0;
+}
+.employee-report-table td {
+  min-width: 100px;
+  max-width: 340px;
+  overflow-wrap: anywhere;
+}
+.employee-report-table a {
+  color: var(--primary-d);
+}
+.employee-report-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.employee-report-pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.employee-report-pagination span {
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--muted);
+}
+.employee-report-state {
+  padding: 30px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: white;
+}
+.employee-report-print-table {
+  display: none;
+}
+.employee-report-document {
+  max-width: 980px;
+  margin: 24px auto;
+  padding: 32px;
+  background: white;
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 24px rgb(23 43 77 / 7%);
+  color: var(--text);
+}
+.employee-report-document-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid var(--primary);
+}
+.employee-report-document-header h2 {
+  font-size: 24px;
+  margin: 10px 0 8px;
+}
+.employee-report-document-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.employee-report-document-header .employee-report-company {
+  color: var(--text);
+  font-weight: 700;
+}
+.employee-report-document-period {
+  display: grid;
+  gap: 8px;
+}
+.employee-report-document-period span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.employee-report-document :is(.employee-report-identity, .employee-report-section) {
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 24px 0;
+  margin: 0;
+}
+.employee-report-document .employee-report-identity dl {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.employee-report-monthly-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+.employee-report-monthly-overview dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.employee-report-monthly-overview dd {
+  margin: 8px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.employee-report-document .employee-report-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+  row-gap: 0;
+}
+.employee-report-document .employee-report-metrics > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid #edf0f5;
+  border-radius: 0;
+  padding: 10px 0;
+  background: transparent;
+}
+.employee-report-document .employee-report-metrics dd {
+  margin: 0;
+  font-size: 14px;
+  text-align: right;
+}
+.employee-report-document .employee-report-table-wrap {
+  max-height: none;
+}
+.employee-report-document-footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 20px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+@media (max-width: 1100px) {
+  .employee-report-document { padding: 24px; }
+}
+@media (max-width: 1000px) {
+  .employee-report-metrics,
+  .employee-report-identity dl {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .employee-report-document { padding: 16px; margin: 16px 0; }
+  .employee-report-document .employee-report-metrics { grid-template-columns: minmax(0, 1fr); }
+  .employee-report-document .employee-report-identity dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .employee-report-metrics,
+  .employee-report-identity dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .employee-report-section,
+  .employee-report-identity {
+    padding: 12px;
+  }
+  .employee-report-filters label {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    flex-basis: 100%;
+  }
+  .employee-report-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .employee-report-metrics dd {
+    font-size: 16px;
+  }
+}
+@media print {
+  .employee-reports-page:has(.employee-report-document) .employee-report-heading { display: none; }
+  .employee-report-document {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+  .employee-report-document :is(.employee-report-identity, .employee-report-section) { padding: 14px 0; }
+  .employee-report-document :is(h2, .employee-report-document-header) { break-after: avoid; }
+  .employee-report-document :is(.employee-report-identity, .employee-report-monthly-overview, tr) { break-inside: avoid; }
+  .employee-report-document .employee-report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .employee-report-document .employee-report-identity dl { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .employee-report-document :is(.employee-report-metrics dd, .employee-report-identity dd) { font-size: 11px; }
+  .employee-report-document .employee-report-note { font-size: 10px; }
+  .employee-report-controls,
+  .employee-report-screen-table {
+    display: none !important;
+  }
+  .employee-report-print-table {
+    display: block;
+  }
+  .employee-report-table-wrap {
+    max-height: none;
+    overflow: visible;
+  }
+  .employee-report-section,
+  .employee-report-identity {
+    border: 0;
+    padding: 10px 0;
+  }
+  .employee-report-metrics > div {
+    break-inside: avoid;
+  }
+  .employee-report-table {
+    font-size: 9px;
+  }
+  .employee-report-table :is(th, td) {
+    min-width: 0;
+    max-width: none;
+    padding: 5px;
+    white-space: normal;
+  }
+  .employee-report-table th {
+    position: static;
+  }
+  .employee-report-table a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .employee-report-heading h1 {
+    font-size: 24px;
+  }
+}

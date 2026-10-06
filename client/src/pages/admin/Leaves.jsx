@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../../api';
+import LeaveDocuments from '../../components/LeaveDocuments';
 import {
   FiCalendar,
   FiCheck,
@@ -67,6 +68,8 @@ export default function Leaves() {
   const [processingId, setProcessingId] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [rejectingLeave, setRejectingLeave] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const load = async () => {
     try {
@@ -96,7 +99,12 @@ export default function Leaves() {
     load();
   }, []);
 
-  const decide = async (id, status) => {
+  const decide = async (id, status, reason = '') => {
+    if (status === 'rejected' && !reason.trim()) {
+      setError('Please enter a reason for rejecting this leave request.');
+      return;
+    }
+
     try {
       setProcessingId(id);
       setError('');
@@ -104,7 +112,13 @@ export default function Leaves() {
 
       await api.patch(`/leaves/${id}/status`, {
         status,
+        ...(status === 'rejected' && { rejection_reason: reason.trim() }),
       });
+
+      if (status === 'rejected') {
+        setRejectingLeave(null);
+        setRejectionReason('');
+      }
 
       setSuccess(
         status === 'approved'
@@ -655,6 +669,40 @@ export default function Leaves() {
           font-size: 12px;
         }
 
+        .leave-rejection-reason {
+          margin-top: 8px;
+          color: #b91c1c;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+          line-height: 1.5;
+        }
+
+        .leave-rejection-form {
+          margin: 16px 20px;
+          padding: 16px;
+          border: 1px solid #fecaca;
+          border-radius: 10px;
+          background: #fff7f7;
+        }
+
+        .leave-rejection-form label {
+          display: block;
+          margin-bottom: 8px;
+          color: #991b1b;
+          font-weight: 650;
+        }
+
+        .leave-rejection-form textarea {
+          width: 100%;
+          min-height: 90px;
+          padding: 10px;
+          margin-bottom: 10px;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          font: inherit;
+          resize: vertical;
+        }
+
         .leaves-empty {
           padding: 55px 20px;
           text-align: center;
@@ -921,6 +969,51 @@ export default function Leaves() {
           </div>
         )}
 
+        {rejectingLeave && (
+          <form
+            className="leave-rejection-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (processingId !== null) return;
+              decide(rejectingLeave.id, 'rejected', rejectionReason);
+            }}
+          >
+            <label htmlFor="leave-rejection-reason">
+              Reason for rejecting {rejectingLeave.name || 'this employee'}’s leave
+              {' '}({formatDate(rejectingLeave.start_date)} – {formatDate(rejectingLeave.end_date)})
+            </label>
+            <textarea
+              id="leave-rejection-reason"
+              value={rejectionReason}
+              onChange={(event) => setRejectionReason(event.target.value)}
+              placeholder="Explain why this leave request is being rejected"
+              required
+              autoFocus
+              disabled={processingId !== null}
+            />
+            <div className="leave-actions">
+              <button
+                type="submit"
+                className="leave-action-btn leave-reject-btn"
+                disabled={processingId !== null || !rejectionReason.trim()}
+              >
+                {processingId === rejectingLeave.id ? 'Rejecting...' : 'Confirm rejection'}
+              </button>
+              <button
+                type="button"
+                className="leave-action-btn"
+                disabled={processingId !== null}
+                onClick={() => {
+                  setRejectingLeave(null);
+                  setRejectionReason('');
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
         {/* TABLE */}
         <div className="leaves-table-wrapper">
           <table className="leaves-table">
@@ -1032,6 +1125,12 @@ export default function Leaves() {
                       >
                         {leave.reason || '-'}
                       </div>
+                      <LeaveDocuments leave={leave} />
+                      {leave.status === 'rejected' && leave.rejection_reason && (
+                        <div className="leave-rejection-reason">
+                          <strong>Rejection reason: </strong>{leave.rejection_reason}
+                        </div>
+                      )}
                     </td>
 
                     {/* STATUS */}
@@ -1071,7 +1170,7 @@ export default function Leaves() {
                               )
                             }
                             disabled={
-                              processingId === leave.id
+                              processingId !== null || rejectingLeave !== null
                             }
                             title="Approve leave request"
                           >
@@ -1090,14 +1189,14 @@ export default function Leaves() {
                           <button
                             type="button"
                             className="leave-action-btn leave-reject-btn"
-                            onClick={() =>
-                              decide(
-                                leave.id,
-                                'rejected'
-                              )
-                            }
+                            onClick={() => {
+                              setRejectingLeave(leave);
+                              setRejectionReason('');
+                              setError('');
+                              setSuccess('');
+                            }}
                             disabled={
-                              processingId === leave.id
+                              processingId !== null || rejectingLeave !== null
                             }
                             title="Reject leave request"
                           >

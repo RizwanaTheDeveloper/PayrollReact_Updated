@@ -36,8 +36,7 @@ app.use('/api/employees', require('./routes/employees'));
 app.use('/api/payslips', require('./routes/payslips'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/leaves', require('./routes/leaves'));
-// Retain the old URL for existing clients; both endpoints use the loans route.
-app.use('/api/advances', require('./routes/loans'));
+app.use('/api/advances', require('./routes/advances'));
 app.use('/api/loans', require('./routes/loans'));
 app.use('/api/reports', require('./routes/reports'));
 

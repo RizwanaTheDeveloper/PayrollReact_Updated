@@ -55,8 +55,8 @@ router.get(
 
         -- Final
         net_pay,
-        COALESCE((SELECT json_agg(json_build_object('advance_id', r.advance_id, 'amount', r.amount) ORDER BY r.advance_id)
-          FROM advance_recoveries r WHERE r.payslip_id = p.id), '[]'::json) AS advance_recoveries
+        COALESCE((SELECT json_agg(json_build_object('advance_id', r.advance_id, 'amount', r.amount, 'record_type', a.record_type) ORDER BY r.advance_id)
+          FROM advance_recoveries r JOIN advances a ON a.id = r.advance_id WHERE r.payslip_id = p.id), '[]'::json) AS advance_recoveries
 
       FROM payslips p
 
@@ -121,8 +121,8 @@ router.get(
           p.*,
           e.name,
           e.emp_code,
-          COALESCE((SELECT json_agg(json_build_object('advance_id', r.advance_id, 'amount', r.amount))
-            FROM advance_recoveries r WHERE r.payslip_id = p.id), '[]'::json) AS advance_recoveries
+          COALESCE((SELECT json_agg(json_build_object('advance_id', r.advance_id, 'amount', r.amount, 'record_type', a.record_type))
+            FROM advance_recoveries r JOIN advances a ON a.id = r.advance_id WHERE r.payslip_id = p.id), '[]'::json) AS advance_recoveries
 
         FROM payslips p
 
@@ -673,8 +673,8 @@ router.get(
           p.*,
 
           -- Employee information
-          COALESCE((SELECT json_agg(json_build_object('advance_id', r.advance_id, 'amount', r.amount) ORDER BY r.advance_id)
-            FROM advance_recoveries r WHERE r.payslip_id = p.id), '[]'::json) AS advance_recoveries,
+          COALESCE((SELECT json_agg(json_build_object('advance_id', r.advance_id, 'amount', r.amount, 'record_type', a.record_type) ORDER BY r.advance_id)
+            FROM advance_recoveries r JOIN advances a ON a.id = r.advance_id WHERE r.payslip_id = p.id), '[]'::json) AS advance_recoveries,
           e.name,
           e.email,
           e.designation,
